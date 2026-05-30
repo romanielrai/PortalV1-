@@ -15,12 +15,21 @@ const nextConfig = {
   },
   async rewrites() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${apiUrl}/:path*`
-      }
-    ];
+    return {
+      beforeFiles: [],
+      afterFiles: [
+        {
+          source: '/api/auth/:path*',
+          destination: '/api/auth/:path*'  // handled by NextAuth, don't proxy
+        }
+      ],
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: `${apiUrl}/:path*`
+        }
+      ]
+    };
   }
 };
 
