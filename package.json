@@ -1,0 +1,22 @@
+{
+  "name": "ai-growth-systems",
+  "private": true,
+  "workspaces": [
+    "app",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm --workspace app run dev\" \"npm --workspace server run dev\"",
+    "dev:app": "npm --workspace app run dev",
+    "dev:server": "npm --workspace server run dev",
+    "build": "npm --workspace app run build && npm --workspace server run build",
+    "start": "concurrently \"npm --workspace app run start\" \"npm --workspace server run start\"",
+    "lint": "npm --workspace app run lint && npm --workspace server run lint"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
