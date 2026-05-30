@@ -13,9 +13,6 @@
     "start": "concurrently \"npm --workspace app run start\" \"npm --workspace server run start\"",
     "lint": "npm --workspace app run lint && npm --workspace server run lint"
   },
-  "dependencies": {
-    "concurrently": "^8.2.0"
-  },
   "devDependencies": {
     "concurrently": "^8.2.0"
   }
