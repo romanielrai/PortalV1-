@@ -25,14 +25,41 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/register', async (req, res) => {
-  const { email, password, name, roleName } = req.body;
+  const { email, password, name, roleName, phoneNumber, businessName } = req.body;
   if (!email || !password || !roleName) return res.status(400).json({ error: 'Missing fields' });
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) return res.status(400).json({ error: 'A user with this email already exists' });
+
   const role = await prisma.role.findUnique({ where: { name: roleName } });
   if (!role) return res.status(400).json({ error: 'Invalid role' });
+
   const passwordHash = await bcrypt.hash(password, 12);
+
+  let clientId: string | undefined = undefined;
+  if (roleName === 'CLIENT' || roleName === 'ADMIN') {
+    const client = await prisma.client.create({
+      data: {
+        companyName: businessName || 'My Business',
+        contactName: name || 'Client User',
+        contactEmail: email,
+        contactPhone: phoneNumber || '',
+        plan: 'GROWTH'
+      }
+    });
+    clientId = client.id;
+  }
+
   const user = await prisma.user.create({
-    data: { email, name, passwordHash, roleId: role.id }
+    data: {
+      email,
+      name,
+      passwordHash,
+      roleId: role.id,
+      clientId
+    }
   });
+
   return res.json({ user: { id: user.id, email: user.email, role: role.name } });
 });
 
