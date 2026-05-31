@@ -5,6 +5,7 @@ import HeroSection from '@/components/HeroSection';
 import ServiceGrid from '@/components/ServiceGrid';
 import AssistantPanel from '@/components/AssistantPanel';
 import PricingSection from '@/components/PricingSection';
+import ContactSection from '@/components/ContactSection';
 import CTASection from '@/components/CTASection';
 import Footer from '@/components/Footer';
 
@@ -43,6 +44,16 @@ export default function HomePage() {
         className="mx-auto mt-24 max-w-6xl"
       >
         <PricingSection />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 40 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8, delay: 0.3 }}
+        className="mx-auto mt-24 max-w-7xl"
+      >
+        <ContactSection />
       </motion.section>
 
       <CTASection />
