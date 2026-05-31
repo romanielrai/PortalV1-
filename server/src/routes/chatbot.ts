@@ -39,7 +39,7 @@ YOUR ROLE:
 Keep responses under 150 words. Be conversational, not robotic.`;
 
 router.post('/conversation', async (req, res) => {
-  const { sessionId, messages, lead, clientId } = req.body;
+  const { sessionId, messages } = req.body;
   let answer = '';
 
   if (openaiKey && openaiKey !== 'your-openai-api-key' && openaiKey !== 'mock-key') {

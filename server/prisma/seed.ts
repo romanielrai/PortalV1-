@@ -6,7 +6,7 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 async function main() {
-  const [adminRole, superAdminRole, clientRole] = await Promise.all([
+  const [adminRole] = await Promise.all([
     prisma.role.upsert({
       where: { name: 'ADMIN' },
       update: {},

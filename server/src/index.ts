@@ -24,6 +24,7 @@ app.use('/api/voice', voiceRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// eslint-disable-next-line no-unused-vars
 app.use((error: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(error);
   res.status(500).json({ error: 'Server error' });

@@ -200,7 +200,7 @@ function createModelProxy(name: string): any {
         }
 
         if (isAggregateLike(prop)) {
-          return async (_args?: any) => ({});
+          return async () => ({});
         }
 
         if (prop === '$disconnect' || prop === '$connect') {
