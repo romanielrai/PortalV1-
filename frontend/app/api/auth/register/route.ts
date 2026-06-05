@@ -14,20 +14,31 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    const contentType = response.headers.get('content-type');
 
     if (!response.ok) {
+      let data;
+      try {
+        data = contentType?.includes('application/json') ? await response.json() : { error: 'Registration failed' };
+      } catch {
+        data = { error: 'Registration failed' };
+      }
       return NextResponse.json(
         { error: data.error || 'Registration failed' },
         { status: response.status }
       );
     }
 
+    if (!contentType?.includes('application/json')) {
+      return NextResponse.json({ error: 'Invalid response format' }, { status: 500 });
+    }
+
+    const data = await response.json();
     return NextResponse.json(data, { status: 200 });
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: 'An error occurred during registration' },
+      { error: 'Failed to connect to API server. Is the backend running on port 4000?' },
       { status: 500 }
     );
   }
