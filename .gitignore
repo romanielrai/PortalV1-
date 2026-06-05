@@ -23,3 +23,5 @@ dist
 # OpenAI temp packages
 openai-4.13.0.tgz
 temp-openai/
+*.tsbuildinfo
+
