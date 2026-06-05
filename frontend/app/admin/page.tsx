@@ -51,21 +51,31 @@ export default function AdminPage() {
   const [appointments, setAppointments] = useState<any[]>([]);
   
   // Custom chatbot training context
-  const [kbEntries, setKbEntries] = useState<{ q: string; a: string }[]>([
-    { q: 'What is the setup time?', a: 'AI receptionist setup is live within 48 hours.' },
-    { q: 'Is there a contract?', a: 'All packages are month-to-month with no long-term contract.' }
-  ]);
+  const [kbEntries, setKbEntries] = useState<{ q: string; a: string }[]>([]);
   const [newQ, setNewQ] = useState('');
   const [newA, setNewA] = useState('');
   
   // Custom call scripts
-  const [voiceScript, setVoiceScript] = useState(
-    'Hello, thanks for calling AI Growth Systems. My name is Sarah, and I am an AI consultant. Are you looking to recover missed calls or automate customer inquiries?'
-  );
+  const [voiceScript, setVoiceScript] = useState('');
 
   // Forms
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [newClient, setNewClient] = useState({ companyName: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'GROWTH' });
+
+  const fetchConfigs = useCallback(async (token: string) => {
+    try {
+      const res = await fetch('/api/admin/configs', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setKbEntries(data.kbEntries || []);
+        setVoiceScript(data.voiceScript || '');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const fetchDashboardData = useCallback(async (token: string) => {
     try {
@@ -115,6 +125,7 @@ export default function AdminPage() {
         if (role === 'SUPERADMIN') setIsSuperAdmin(true);
         fetchLeads(token);
         fetchDashboardData(token);
+        fetchConfigs(token);
       } else {
         router.push('/login');
         return;
@@ -124,7 +135,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, fetchLeads, fetchDashboardData]);
+  }, [router, fetchLeads, fetchDashboardData, fetchConfigs]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -137,6 +148,7 @@ export default function AdminPage() {
     if (token) {
       fetchLeads(token);
       fetchDashboardData(token);
+      fetchConfigs(token);
     }
   };
 
@@ -207,6 +219,43 @@ export default function AdminPage() {
       });
       if (res.ok) {
         fetchLeads(token);
+        fetchDashboardData(token);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleSuspendClient = async (client: any) => {
+    const token = localStorage.getItem('token') || '';
+    const newStatus = client.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
+    try {
+      const res = await fetch(`/api/admin/clients/${client.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        loadModuleData('manage-clients');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteClient = async (clientId: string) => {
+    if (!confirm('Are you sure you want to delete this client account and all related records?')) return;
+    const token = localStorage.getItem('token') || '';
+    try {
+      const res = await fetch(`/api/admin/clients/${clientId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        loadModuleData('manage-clients');
         fetchDashboardData(token);
       }
     } catch (e) {
@@ -483,12 +532,14 @@ export default function AdminPage() {
                           <th className="p-3">Contact</th>
                           <th className="p-3">Plan</th>
                           <th className="p-3">Phone</th>
+                          <th className="p-3 text-center">Status</th>
+                          <th className="p-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {clientsList.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="p-8 text-center text-white/50">Loading clients...</td>
+                            <td colSpan={6} className="p-8 text-center text-white/50">Loading clients...</td>
                           </tr>
                         ) : (
                           clientsList.map((client) => (
@@ -501,6 +552,36 @@ export default function AdminPage() {
                                 </span>
                               </td>
                               <td className="p-3 text-white/50">{client.contactPhone || 'N/A'}</td>
+                              <td className="p-3 text-center">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-2xs font-semibold border ${
+                                  client.status === 'SUSPENDED' 
+                                    ? 'bg-red-950/20 text-red-400 border-red-500/20' 
+                                    : 'bg-green-950/20 text-green-400 border-green-500/20'
+                                }`}>
+                                  {client.status || 'ACTIVE'}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => handleToggleSuspendClient(client)}
+                                    className={`rounded px-2 py-1 text-2xs border ${
+                                      client.status === 'SUSPENDED' 
+                                        ? 'bg-green-900/10 text-green-400 border-green-500/20 hover:bg-green-900/20' 
+                                        : 'bg-amber-900/10 text-amber-400 border-amber-500/20 hover:bg-amber-900/20'
+                                    }`}
+                                  >
+                                    {client.status === 'SUSPENDED' ? 'Activate' : 'Suspend'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteClient(client.id)}
+                                    className="rounded p-1.5 bg-red-900/10 text-red-400 border border-red-500/20 hover:bg-red-900/20"
+                                    title="Delete Client"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))
                         )}
@@ -765,11 +846,29 @@ export default function AdminPage() {
                         />
                       </div>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (!newQ || !newA) return;
-                          setKbEntries([...kbEntries, { q: newQ, a: newA }]);
-                          setNewQ('');
-                          setNewA('');
+                          const updatedKB = [...kbEntries, { q: newQ, a: newA }];
+                          const token = localStorage.getItem('token') || '';
+                          try {
+                            const res = await fetch('/api/admin/configs', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`
+                              },
+                              body: JSON.stringify({ kbEntries: updatedKB })
+                            });
+                            if (res.ok) {
+                              setKbEntries(updatedKB);
+                              setNewQ('');
+                              setNewA('');
+                            } else {
+                              alert('Failed to save chatbot training data.');
+                            }
+                          } catch (err) {
+                            alert('Network error saving chatbot training data.');
+                          }
                         }}
                         className="rounded-full bg-gold text-background px-4 py-2 text-xs font-semibold hover:brightness-95 transition"
                       >
@@ -805,9 +904,26 @@ export default function AdminPage() {
                     />
                   </div>
                   <button
-                    onClick={() => {
-                      alert('AI Script prompt template updated successfully in simulation cache.');
-                      closeAction();
+                    onClick={async () => {
+                      const token = localStorage.getItem('token') || '';
+                      try {
+                        const res = await fetch('/api/admin/configs', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`
+                          },
+                          body: JSON.stringify({ voiceScript })
+                        });
+                        if (res.ok) {
+                          alert('AI Voice Script prompt template updated successfully.');
+                          closeAction();
+                        } else {
+                          alert('Failed to update voice script.');
+                        }
+                      } catch (err) {
+                        alert('Network error updating voice script.');
+                      }
                     }}
                     className="rounded-full bg-gold text-background px-5 py-2.5 text-xs font-semibold hover:brightness-95 transition"
                   >

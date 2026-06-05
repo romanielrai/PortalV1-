@@ -1,32 +1,28 @@
 import { Router } from 'express';
 import twilio from 'twilio';
 import { prisma } from '../prisma';
+import { getConfigs } from '../config-store';
 
 const router = Router();
-const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
-const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
-
-if (!twilioAccountSid || !twilioAuthToken) {
-  console.warn('WARNING: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are not defined. Voice calls will run in SIMULATION mode.');
-}
-
-let twilioClient: ReturnType<typeof twilio> | null = null;
-if (twilioAccountSid && twilioAuthToken && typeof twilioAccountSid === 'string' && twilioAccountSid.startsWith('AC')) {
-  try {
-    twilioClient = twilio(twilioAccountSid, twilioAuthToken);
-  } catch (err) {
-    console.error('Twilio initialization error:', err);
-    twilioClient = null;
-  }
-} else {
-  if (twilioAccountSid || twilioAuthToken) console.warn('Twilio credentials present but invalid format; running in simulation mode.');
-}
 
 router.post('/call', async (req, res) => {
   try {
     const { to, from, clientId, leadId } = req.body;
     if (!to || !from) {
       return res.status(400).json({ error: 'Both to and from numbers are required' });
+    }
+
+    const configs = getConfigs();
+    const activeSid = configs.twilioAccountSid;
+    const activeToken = configs.twilioAuthToken;
+
+    let twilioClient: ReturnType<typeof twilio> | null = null;
+    if (activeSid && activeToken && activeSid.startsWith('AC') && activeToken.trim().length > 0) {
+      try {
+        twilioClient = twilio(activeSid, activeToken);
+      } catch (err) {
+        console.error('Twilio client initialization error:', err);
+      }
     }
 
     let sid = 'mock-call-sid-' + Math.random().toString(36).substring(7);
@@ -37,7 +33,7 @@ router.post('/call', async (req, res) => {
         const call = await twilioClient.calls.create({
           url: process.env.TWILIO_CALLBACK_URL ?? 'http://demo.twilio.com/docs/voice.xml',
           to,
-          from
+          from: configs.twilioPhoneNumber || from
         });
         sid = call.sid;
         status = call.status;

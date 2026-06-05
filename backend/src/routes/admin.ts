@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { getConfigs, updateConfigs } from '../config-store';
 
 const router = Router();
 
@@ -40,7 +41,7 @@ router.post('/clients', async (req: any, res) => {
     });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'CREATE_CLIENT',
         actor: req.user?.email || 'admin',
@@ -60,7 +61,7 @@ router.post('/clients', async (req: any, res) => {
 router.patch('/clients/:id', async (req: any, res) => {
   try {
     const { id } = req.params;
-    const { companyName, contactName, contactEmail, contactPhone, plan } = req.body;
+    const { companyName, contactName, contactEmail, contactPhone, plan, status } = req.body;
 
     const client = await prisma.client.findUnique({ where: { id } });
     if (!client) {
@@ -73,6 +74,7 @@ router.patch('/clients/:id', async (req: any, res) => {
     if (contactEmail !== undefined) updateData.contactEmail = contactEmail;
     if (contactPhone !== undefined) updateData.contactPhone = contactPhone;
     if (plan !== undefined) updateData.plan = plan;
+    if (status !== undefined) updateData.status = status;
 
     const updatedClient = await prisma.client.update({
       where: { id },
@@ -80,7 +82,7 @@ router.patch('/clients/:id', async (req: any, res) => {
     });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'UPDATE_CLIENT',
         actor: req.user?.email || 'admin',
@@ -93,6 +95,35 @@ router.patch('/clients/:id', async (req: any, res) => {
   } catch (error: any) {
     console.error('Update client error:', error);
     return res.status(500).json({ error: error.message || 'Failed to update client' });
+  }
+});
+
+// Delete client
+router.delete('/clients/:id', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    const client = await prisma.client.findUnique({ where: { id } });
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    await prisma.client.delete({ where: { id } });
+
+    // Write audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'DELETE_CLIENT',
+        actor: req.user?.email || 'admin',
+        details: `Deleted client account '${client.companyName}'`,
+        ipAddress: req.ip || '127.0.0.1'
+      }
+    });
+
+    return res.json({ message: 'Client deleted successfully' });
+  } catch (error: any) {
+    console.error('Delete client error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to delete client' });
   }
 });
 
@@ -132,7 +163,7 @@ router.patch('/appointments/:id', async (req: any, res) => {
     });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'UPDATE_APPOINTMENT',
         actor: req.user?.email || 'admin',
@@ -145,6 +176,45 @@ router.patch('/appointments/:id', async (req: any, res) => {
   } catch (error: any) {
     console.error('Update appointment error:', error);
     return res.status(500).json({ error: error.message || 'Failed to update appointment' });
+  }
+});
+
+// --- ADMIN SYSTEM CONFIGS ---
+router.get('/configs', async (req, res) => {
+  try {
+    const configs = getConfigs();
+    return res.json({ kbEntries: configs.kbEntries, voiceScript: configs.voiceProfile });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to fetch settings' });
+  }
+});
+
+router.post('/configs', async (req: any, res) => {
+  try {
+    const { kbEntries, voiceScript } = req.body;
+    const updates: any = {};
+    if (kbEntries !== undefined) updates.kbEntries = kbEntries;
+    if (voiceScript !== undefined) updates.voiceProfile = voiceScript; // Map voiceScript to voiceProfile field
+    
+    const configs = updateConfigs(updates);
+
+    // Write audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'UPDATE_ADMIN_CONFIGS',
+        actor: req.user?.email || 'admin',
+        details: 'Admin updated chatbot knowledge base or voice scripts',
+        ipAddress: req.ip || '127.0.0.1'
+      }
+    });
+
+    return res.json({ 
+      message: 'Settings updated successfully', 
+      kbEntries: configs.kbEntries, 
+      voiceScript: configs.voiceProfile 
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Failed to update settings' });
   }
 });
 

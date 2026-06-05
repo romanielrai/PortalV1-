@@ -21,8 +21,10 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'http://localhost:5504',
   'http://127.0.0.1:3000',
-  'http://127.0.0.1:3001'
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:5504'
 ];
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);

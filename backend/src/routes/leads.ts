@@ -70,7 +70,7 @@ router.patch('/:id', requireAuth, async (req: AuthRequest, res) => {
     });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'UPDATE_LEAD',
         actor: req.user?.email || 'user',
@@ -99,7 +99,7 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
     await prisma.lead.delete({ where: { id } });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'DELETE_LEAD',
         actor: req.user?.email || 'user',

@@ -1,61 +1,39 @@
 import { Router } from 'express';
 import { OpenAI } from 'openai';
 import { prisma } from '../prisma';
+import { getConfigs } from '../config-store';
 
 const router = Router();
-const openaiKey = process.env.OPENAI_API_KEY;
-if (!openaiKey) {
-  console.warn('WARNING: OPENAI_API_KEY is not defined. Chatbot will run in SIMULATION mode.');
-}
-const client = new OpenAI({ apiKey: openaiKey || 'mock-key' });
-
-const systemPrompt = `You are a high-ticket AI sales consultant for AI Growth Systems — a premium enterprise AI automation agency.
-
-COMPANY SERVICES:
-1. AI Receptionist & Appointment Setter – 24/7 inbound call answering, lead qualification, appointment booking, weekly reporting. Live within 48 hours.
-2. Missed Call Recovery – AI callback within 10 seconds of any missed call, automated SMS, email alerts, CRM integration.
-3. Dead Lead Reactivation – AI email/SMS campaigns to revive cold contacts with lead scoring and revenue recovery reporting.
-
-PRICING PACKAGES:
-- Starter ($1,497/mo): AI receptionist, custom scripts, weekly reports, email support
-- Growth ($2,997/mo): Everything in Starter + missed call recovery, SMS follow-ups, CRM integration, bi-weekly strategy calls
-- Dominance ($5,997/mo): Everything in Growth + dead lead reactivation, unlimited contacts, brand-trained voice, dedicated success manager
-
-GUARANTEES:
-- Live AI agent setup within 48 hours
-- Missed calls recovered within 10 seconds
-- Dedicated onboarding and campaign management
-- Full ROI reporting dashboard
-
-YOUR ROLE:
-- Act as a warm, consultative, high-ticket sales specialist
-- Qualify leads by asking about their business type and current call volume
-- Address objections confidently (e.g., "We already have staff" → explain 24/7 coverage and cost savings)
-- Guide conversations toward booking a demo consultation
-- Be concise, professional, and results-focused
-- Never make up services or features not listed above
-- When asked to book, direct them to the Book Demo page
-
-Keep responses under 150 words. Be conversational, not robotic.`;
 
 router.post('/conversation', async (req, res) => {
   try {
     const { sessionId, messages } = req.body;
     let answer = '';
 
-    if (openaiKey && openaiKey !== 'your-openai-api-key' && openaiKey !== 'mock-key') {
+    const configs = getConfigs();
+    const activeOpenaiKey = configs.openaiApiKey;
+    
+    // Check if real key is present
+    const isRealKey = activeOpenaiKey && 
+                      activeOpenaiKey !== 'your-openai-api-key' && 
+                      activeOpenaiKey !== 'sk-your-openai-api-key-here' &&
+                      activeOpenaiKey !== 'mock-key' &&
+                      activeOpenaiKey.trim().length > 0;
+
+    if (isRealKey) {
       try {
+        const client = new OpenAI({ apiKey: activeOpenaiKey });
         const formattedMessages = (messages ?? []).map((m: any) => ({
           role: m.role === 'user' ? 'user' : 'assistant',
           content: m.text || m.content || ''
         }));
         const response = await client.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: configs.openaiModel || 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: systemPrompt },
+            { role: 'system', content: configs.systemPrompt },
             ...formattedMessages
           ],
-          temperature: 0.3,
+          temperature: configs.openaiTemperature ?? 0.3,
           max_tokens: 250
         });
         answer = response.choices?.[0]?.message?.content ?? '';
@@ -68,7 +46,14 @@ router.post('/conversation', async (req, res) => {
     if (!answer) {
       const last = [...(messages ?? [])].reverse().find(m => m.role === 'user')?.text?.toLowerCase() ?? '';
 
-      if (last.includes('price') || last.includes('cost') || last.includes('pricing') || last.includes('tier') || last.includes('package') || last.includes('plan')) {
+      // Check if matches any custom Q&A from trained knowledge base
+      const matchedKB = (configs.kbEntries || []).find(entry => 
+        last.includes(entry.q.toLowerCase()) || entry.q.toLowerCase().includes(last)
+      );
+
+      if (matchedKB) {
+        answer = matchedKB.a;
+      } else if (last.includes('price') || last.includes('cost') || last.includes('pricing') || last.includes('tier') || last.includes('package') || last.includes('plan')) {
         answer = `We have three packages designed for real ROI. The Starter at 1,497 dollars per month gives you a 24/7 AI receptionist with custom scripts and weekly reports. The Growth plan at 2,997 dollars adds missed call recovery, CRM integration, and bi-weekly strategy calls — this is our most popular. And the Dominance plan at 5,997 dollars includes everything, plus dead lead reactivation and a dedicated success manager. Most clients see a return within 30 days. Which sounds like the right fit for your business?`;
 
       } else if (last.includes('guarantee') || last.includes('roi') || last.includes('result') || last.includes('work') || last.includes('worth')) {
@@ -99,7 +84,7 @@ router.post('/conversation', async (req, res) => {
         sessionId: sessionId ?? 'session-unknown',
         role: 'assistant',
         message: answer,
-        metadata: JSON.stringify({ source: openaiKey && openaiKey !== 'mock-key' ? 'openai' : 'simulation' })
+        metadata: JSON.stringify({ source: isRealKey ? 'openai' : 'simulation' })
       }
     });
 

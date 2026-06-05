@@ -2,26 +2,9 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { getConfigs, updateConfigs } from '../config-store';
 
 const router = Router();
-
-// Modular in-memory configs that persist in server session
-let systemConfigs = {
-  openaiApiKey: process.env.OPENAI_API_KEY || 'mock-key',
-  openaiModel: 'gpt-4o-mini',
-  openaiTemperature: 0.3,
-  systemPrompt: 'You are a high-ticket AI sales consultant for AI Growth Systems...',
-  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || 'ACmock',
-  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || 'mocktoken',
-  twilioPhoneNumber: '+15550199',
-  elevenLabsApiKey: 'mock-eleven-labs-key',
-  voiceProfile: 'Rachel',
-  crmConnected: {
-    gohighlevel: true,
-    hubspot: false,
-    salesforce: false
-  }
-};
 
 // Apply auth & role requirements to all routes in this controller
 router.use(requireAuth);
@@ -72,7 +55,7 @@ router.post('/users', async (req: any, res) => {
     });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'CREATE_USER',
         actor: req.user?.email || 'superadmin',
@@ -119,7 +102,7 @@ router.patch('/users/:id', async (req: any, res) => {
     });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'UPDATE_USER',
         actor: req.user?.email || 'superadmin',
@@ -148,7 +131,7 @@ router.delete('/users/:id', async (req: any, res) => {
     await prisma.user.delete({ where: { id } });
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'DELETE_USER',
         actor: req.user?.email || 'superadmin',
@@ -167,7 +150,7 @@ router.delete('/users/:id', async (req: any, res) => {
 // --- AUDIT LOGS ---
 router.get('/audit-logs', async (req, res) => {
   try {
-    const logs = await prisma.auditlog.findMany({
+    const logs = await prisma.auditLog.findMany({
       orderBy: { createdAt: 'desc' }
     });
     return res.json({ logs });
@@ -179,7 +162,7 @@ router.get('/audit-logs', async (req, res) => {
 // --- CONVERSATION LOGS ---
 router.get('/conversation-logs', async (req, res) => {
   try {
-    const logs = await prisma.chatbotlog.findMany({
+    const logs = await prisma.chatbotLog.findMany({
       orderBy: { createdAt: 'desc' }
     });
     return res.json({ logs });
@@ -190,16 +173,16 @@ router.get('/conversation-logs', async (req, res) => {
 
 // --- SYSTEM CONFIGS ---
 router.get('/configs', (req, res) => {
-  return res.json({ configs: systemConfigs });
+  return res.json({ configs: getConfigs() });
 });
 
 router.post('/configs', async (req: any, res) => {
   try {
     const newConfigs = req.body;
-    systemConfigs = { ...systemConfigs, ...newConfigs };
+    const configs = updateConfigs(newConfigs);
 
     // Write audit log
-    await prisma.auditlog.create({
+    await prisma.auditLog.create({
       data: {
         action: 'UPDATE_CONFIG',
         actor: req.user?.email || 'superadmin',
@@ -208,7 +191,7 @@ router.post('/configs', async (req: any, res) => {
       }
     });
 
-    return res.json({ message: 'Configurations updated successfully', configs: systemConfigs });
+    return res.json({ message: 'Configurations updated successfully', configs });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Failed to save configurations' });
   }
