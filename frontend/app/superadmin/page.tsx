@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Users, CreditCard, Brain, Phone, FileText,
   Activity, Database, MessageSquare, Server, ShieldAlert, ArrowLeft, RefreshCw, LogOut,
-  X, Check, AlertTriangle, Plus, Trash2, Edit2, ShieldAlert as LockIcon
+  X, Plus, Trash2
 } from 'lucide-react';
 
 const superAdminModules = [

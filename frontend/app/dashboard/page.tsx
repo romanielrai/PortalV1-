@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut, Users, PhoneCall, CalendarDays, RefreshCw, Plus, Send, PhoneOutgoing, X } from 'lucide-react';
 

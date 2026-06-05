@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Users, PhoneCall, CalendarDays, RefreshCw, Settings, BookOpen, 
-  ShieldCheck, BarChart3, LogOut, X, Plus, Trash2, Check, ArrowLeft 
+  ShieldCheck, BarChart3, LogOut, X, Plus, Trash2 
 } from 'lucide-react';
 
 interface Lead {

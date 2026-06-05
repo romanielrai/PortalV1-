@@ -21,13 +21,13 @@ async function main() {
     create: { name: 'ADMIN', description: 'Administrator access to manage clients and analytics' }
   });
 
-  const clientRole = await prisma.role.upsert({
+  await prisma.role.upsert({
     where: { name: 'CLIENT' },
     update: {},
     create: { name: 'CLIENT', description: 'Client access to dashboard and reports' }
   });
 
-  const userRole = await prisma.role.upsert({
+  await prisma.role.upsert({
     where: { name: 'USER' },
     update: {},
     create: { name: 'USER', description: 'Regular end user access' }
