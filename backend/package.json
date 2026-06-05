@@ -11,7 +11,7 @@
     "lint": "eslint . --ext .ts"
   },
   "dependencies": {
-    "@prisma/client": "^7.8.0",
+    "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.6",
     "dotenv": "^16.4.3",
@@ -19,7 +19,6 @@
     "express-async-errors": "^3.1.1",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.2",
-    "next": "15.2.3",
     "openai": "^4.13.0",
     "pg": "^8.12.0",
     "prisma": "^5.22.0",

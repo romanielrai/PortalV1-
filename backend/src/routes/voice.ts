@@ -10,7 +10,7 @@ if (!twilioAccountSid || !twilioAuthToken) {
   console.warn('WARNING: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are not defined. Voice calls will run in SIMULATION mode.');
 }
 
-let twilioClient = null;
+let twilioClient: ReturnType<typeof twilio> | null = null;
 if (twilioAccountSid && twilioAuthToken && typeof twilioAccountSid === 'string' && twilioAccountSid.startsWith('AC')) {
   try {
     twilioClient = twilio(twilioAccountSid, twilioAuthToken);

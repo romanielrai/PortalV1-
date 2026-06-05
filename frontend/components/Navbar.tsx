@@ -82,6 +82,45 @@ export default function Navbar() {
     setMobileOpen(false);
   }, [pathname]);
 
+  // Handle smooth scroll when navigating to/on the homepage with a hash
+  useEffect(() => {
+    const handleHashScroll = () => {
+      if (pathname === '/' && typeof window !== 'undefined' && window.location.hash) {
+        const id = window.location.hash.substring(1);
+        const element = document.getElementById(id);
+        if (element) {
+          setTimeout(() => {
+            element.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+      }
+    };
+
+    handleHashScroll();
+    window.addEventListener('hashchange', handleHashScroll);
+    return () => window.removeEventListener('hashchange', handleHashScroll);
+  }, [pathname]);
+
+  // Smooth scroll handler for navigation clicks
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href === '/') {
+      if (typeof window !== 'undefined' && pathname === '/') {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } else if (href.startsWith('/#')) {
+      if (typeof window !== 'undefined' && pathname === '/') {
+        e.preventDefault();
+        const id = href.replace('/#', '');
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+          window.history.pushState(null, '', href);
+        }
+      }
+    }
+  };
+
   // Determine combined login state (legacy OR Google session)
   const effectiveLoggedIn = isLoggedIn || !!session;
 
@@ -156,14 +195,7 @@ export default function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={(e) => {
-                  if (item.href === '/') {
-                    if (typeof window !== 'undefined' && window.location.pathname === '/') {
-                      e.preventDefault();
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
-                  }
-                }}
+                onClick={(e) => handleNavClick(e, item.href)}
                 className="text-sm text-foreground transition hover:text-gold"
               >
                 {item.label}
@@ -259,14 +291,7 @@ export default function Navbar() {
                   href={item.href}
                   onClick={(e) => {
                     setMobileOpen(false);
-                    if (item.href === '/') {
-                      if (typeof window !== 'undefined' && window.location.pathname === '/') {
-                        e.preventDefault();
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      } else {
-                        // let Next handle navigation
-                      }
-                    }
+                    handleNavClick(e, item.href);
                   }}
                   className="rounded-2xl px-4 py-3 text-sm text-foreground transition hover:bg-white/5 hover:text-gold"
                 >
