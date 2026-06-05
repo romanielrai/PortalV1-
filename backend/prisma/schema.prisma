@@ -12,6 +12,7 @@ model User {
   email         String       @unique
   name          String?
   passwordHash  String
+  suspended     Boolean      @default(false)
   role          Role         @relation(fields: [roleId], references: [id])
   roleId        String
   client        Client?      @relation(fields: [clientId], references: [id])
@@ -213,7 +214,9 @@ model AuditLog {
   user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   userId      String?
   action      String
+  actor       String?
   target      String?
+  details     String?
   ipAddress   String?
   createdAt   DateTime @default(now())
 }

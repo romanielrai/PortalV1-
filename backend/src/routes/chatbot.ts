@@ -99,7 +99,7 @@ router.post('/conversation', async (req, res) => {
         sessionId: sessionId ?? 'session-unknown',
         role: 'assistant',
         message: answer,
-        metadata: { source: openaiKey && openaiKey !== 'mock-key' ? 'openai' : 'simulation' }
+        metadata: JSON.stringify({ source: openaiKey && openaiKey !== 'mock-key' ? 'openai' : 'simulation' })
       }
     });
 

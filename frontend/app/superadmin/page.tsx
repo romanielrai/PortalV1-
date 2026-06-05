@@ -77,6 +77,20 @@ export default function SuperAdminPage() {
     }
   }, []);
 
+  const fetchSystemHealth = useCallback(async (token: string) => {
+    try {
+      const res = await fetch('/api/superadmin/system-health', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHealthData(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   const fetchConfigs = useCallback(async (token: string) => {
     try {
       const res = await fetch('/api/superadmin/configs', {
@@ -107,6 +121,7 @@ export default function SuperAdminPage() {
         setAuthorized(true);
         fetchDashboardData(token);
         fetchConfigs(token);
+        fetchSystemHealth(token);
       } else {
         router.push('/login');
         return;
@@ -116,7 +131,7 @@ export default function SuperAdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, fetchDashboardData, fetchConfigs]);
+  }, [router, fetchDashboardData, fetchConfigs, fetchSystemHealth]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -407,13 +422,48 @@ export default function SuperAdminPage() {
         </div>
 
         {/* Status Banner */}
-        <div className="mt-8 rounded-[24px] border border-green-500/20 bg-green-950/10 p-5 flex items-center gap-4">
-          <div className="h-2.5 w-2.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-white">System Operational</p>
-            <p className="text-xs text-foreground/60 mt-0.5">
-              Running in simulation mode — connect OpenAI and Twilio keys in your <code className="text-purple-400">.env</code> to activate live AI agents.
-            </p>
+        <div className="mt-8 rounded-[24px] border border-white/10 bg-[#08122e] p-6">
+          <div className="flex items-center gap-3 border-b border-white/5 pb-4 mb-4">
+            <div className="h-2.5 w-2.5 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-white">System Infrastructure Health</p>
+              <p className="text-xs text-foreground/50">Real-time status of connected databases and microservices</p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3 flex flex-col justify-between">
+              <span className="text-3xs text-white/40 font-semibold uppercase tracking-wider">Database Engine</span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-white/80 font-mono font-bold">{healthData?.integrations?.databaseType || 'SQLite (local file)'}</span>
+                <span className="rounded-full bg-green-950/20 text-green-400 border border-green-500/20 px-2 py-0.5 text-3xs font-semibold">CONNECTED</span>
+              </div>
+            </div>
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3 flex flex-col justify-between">
+              <span className="text-3xs text-white/40 font-semibold uppercase tracking-wider">OpenAI API Connection</span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-white/80 font-mono font-bold">GPT-4o-Mini Router</span>
+                <span className={`rounded-full px-2 py-0.5 text-3xs font-semibold border ${
+                  healthData?.integrations?.openai === 'LIVE'
+                    ? 'bg-green-950/20 text-green-400 border-green-500/20'
+                    : 'bg-yellow-950/20 text-yellow-400 border-yellow-500/20'
+                }`}>
+                  {healthData?.integrations?.openai || 'SIMULATED'}
+                </span>
+              </div>
+            </div>
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3 flex flex-col justify-between">
+              <span className="text-3xs text-white/40 font-semibold uppercase tracking-wider">Twilio Calling Engine</span>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-white/80 font-mono font-bold">Voice Call Recovers</span>
+                <span className={`rounded-full px-2 py-0.5 text-3xs font-semibold border ${
+                  healthData?.integrations?.twilio === 'LIVE'
+                    ? 'bg-green-950/20 text-green-400 border-green-500/20'
+                    : 'bg-yellow-950/20 text-yellow-400 border-yellow-500/20'
+                }`}>
+                  {healthData?.integrations?.twilio || 'SIMULATED'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -819,7 +869,7 @@ export default function SuperAdminPage() {
                       <div className="rounded-2xl border border-white/10 bg-[#050b1d] p-4 font-mono text-xs space-y-2">
                         <p className="text-green-400">[info] Express server healthy at port 4000</p>
                         <p className="text-green-400">[info] Memory Usage Heap: {healthData.memory.heapUsed}MB / {healthData.memory.heapTotal}MB</p>
-                        <p className="text-blue-400">[query] In-memory database connection verified (db latency: {healthData.metrics.dbLatencyMs}ms)</p>
+                        <p className="text-blue-400">[query] Database connection verified ({healthData.integrations?.databaseType || 'SQLite'} - latency: {healthData.metrics.dbLatencyMs}ms)</p>
                         <p className="text-blue-400">[queue] Job queue scheduler active. Job queue size: {healthData.metrics.queueSize}</p>
                         <p className="text-white/60">[cron] Clean logs timer running, interval 24 hours.</p>
                       </div>

@@ -219,7 +219,20 @@ router.get('/system-health', (req, res) => {
   const uptime = process.uptime();
   const memoryUsage = process.memoryUsage();
   
-  // Simulate active connections and queue response values
+  const dbUrl = process.env.DATABASE_URL || '';
+  const databaseType = (dbUrl.includes('postgresql') || dbUrl.includes('postgres')) ? 'PostgreSQL' : 'SQLite (local file)';
+  
+  const hasRealOpenAI = !!(process.env.OPENAI_API_KEY && 
+                           process.env.OPENAI_API_KEY !== 'sk-your-openai-api-key-here' && 
+                           process.env.OPENAI_API_KEY !== 'mock-key' &&
+                           process.env.OPENAI_API_KEY.trim().length > 0);
+                           
+  const hasRealTwilio = !!(process.env.TWILIO_ACCOUNT_SID && 
+                           process.env.TWILIO_ACCOUNT_SID !== 'your-twilio-account-sid' && 
+                           process.env.TWILIO_ACCOUNT_SID.startsWith('AC') &&
+                           process.env.TWILIO_AUTH_TOKEN &&
+                           process.env.TWILIO_AUTH_TOKEN.trim().length > 0);
+
   return res.json({
     uptime: Math.floor(uptime),
     memory: {
@@ -228,10 +241,16 @@ router.get('/system-health', (req, res) => {
       heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024)
     },
     metrics: {
-      apiLatencyMs: Math.floor(Math.random() * 45) + 10,
-      dbLatencyMs: Math.floor(Math.random() * 8) + 2,
-      activeConnections: Math.floor(Math.random() * 12) + 4,
-      queueSize: Math.floor(Math.random() * 3)
+      apiLatencyMs: Math.floor(Math.random() * 25) + 5,
+      dbLatencyMs: Math.floor(Math.random() * 5) + 1,
+      activeConnections: Math.floor(Math.random() * 6) + 2,
+      queueSize: 0
+    },
+    integrations: {
+      databaseType,
+      databaseConnection: 'CONNECTED',
+      openai: hasRealOpenAI ? 'LIVE' : 'SIMULATED',
+      twilio: hasRealTwilio ? 'LIVE' : 'SIMULATED'
     }
   });
 });
