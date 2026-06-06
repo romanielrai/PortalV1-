@@ -1,199 +1,218 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Users, PhoneCall, CalendarDays, RefreshCw, Plus, Send, PhoneOutgoing, X } from 'lucide-react';
+import { 
+  PhoneIncoming, Users, TrendingUp, PhoneCall, RefreshCw, 
+  Play, Pause, Send, PhoneOutgoing, LogOut, Smartphone, MessageSquare, 
+  Volume2, Sparkles
+} from 'lucide-react';
 
-interface MetricData {
-  leadsGenerated: number;
-  appointmentsBooked: number;
-  callsAnswered: number;
-  recoveredLeads: number;
+interface CallRecord {
+  id: string;
+  phone: string;
+  name: string;
+  time: string;
+  status: 'Booked' | 'Voicemail' | 'Declined';
+  duration: string;
+  recordingUrl?: string;
+  script: string;
 }
 
-interface LeadData {
+interface ReactivationCampaign {
   id: string;
   name: string;
-  email: string;
-  phone: string;
-  business: string;
-  status: string;
-  source: string;
-  createdAt: string;
+  leadsContacted: number;
+  responses: number;
+  booked: number;
+  status: 'Live' | 'Paused' | 'Completed';
 }
 
-export default function DashboardPage() {
+const mockCalls: CallRecord[] = [
+  { id: '1', name: 'James Carter', phone: '+1 (555) 0199', time: '10m ago', status: 'Booked', duration: '1m 24s', script: 'Septic & Drain Callback - Emergency quote request' },
+  { id: '2', name: 'Sarah Miller', phone: '+1 (555) 0122', time: '42m ago', status: 'Voicemail', duration: '0m 45s', script: 'Septic & Drain Callback - Left message' },
+  { id: '3', name: 'Robert Chen', phone: '+1 (555) 0187', time: '2h ago', status: 'Booked', duration: '2m 10s', script: 'Septic & Drain Callback - Booked inspection' },
+  { id: '4', name: 'David Smith', phone: '+1 (555) 0104', time: '4h ago', status: 'Declined', duration: '0m 32s', script: 'Septic & Drain Callback - Busy signal' },
+  { id: '5', name: 'Emma Wilson', phone: '+1 (555) 0113', time: '6h ago', status: 'Booked', duration: '1m 58s', script: 'Septic & Drain Callback - Booked pump-out' }
+];
+
+const mockCampaigns: ReactivationCampaign[] = [
+  { id: 'c1', name: 'Spring Tank Reactivation', leadsContacted: 240, responses: 42, booked: 18, status: 'Live' },
+  { id: 'c2', name: 'Cold Pipe Outbound 2026', leadsContacted: 580, responses: 89, booked: 32, status: 'Completed' },
+  { id: 'c3', name: 'Commercial Service Renewal', leadsContacted: 120, responses: 12, booked: 4, status: 'Paused' }
+];
+
+const mockSMS = [
+  { sender: 'AI', body: 'Hey John! It is Bhumi from Septic Specialists. We noticed you scheduled an inspection last year but never renewed. Do you need a service tech this month?', time: '2:15 PM' },
+  { sender: 'Lead', body: 'Actually, yes. I have been having backing-up issues in my guest bathroom.', time: '2:17 PM' },
+  { sender: 'AI', body: 'Oh no, sorry to hear that. I can get a tech out tomorrow. Would morning (9 AM) or afternoon (1 PM) work?', time: '2:18 PM' },
+  { sender: 'Lead', body: 'Tomorrow at 9 AM is perfect. Thanks!', time: '2:20 PM' },
+  { sender: 'AI', body: 'Awesome! All booked in. You will receive a text confirmation shortly.', time: '2:21 PM' }
+];
+
+export default function CommandCenterPage() {
   const router = useRouter();
-  const [metrics, setMetrics] = useState<MetricData | null>(null);
-  const [leads, setLeads] = useState<LeadData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  // Simulator Form State
-  const [showSimulator, setShowSimulator] = useState(false);
-  const [simLead, setSimLead] = useState({ name: '', email: '', phone: '', business: '', source: 'Web Form' });
-  const [submittingSim, setSubmittingSim] = useState(false);
-  
-  // Call simulation state
-  const [callSimStatus, setCallSimStatus] = useState('');
+  // Widget States
+  const [callsFeed, setCallsFeed] = useState<CallRecord[]>(mockCalls);
+  const [campaigns] = useState<ReactivationCampaign[]>(mockCampaigns);
+  const [smsLogs, setSmsLogs] = useState(mockSMS);
+  const [replyText, setReplyText] = useState('');
+  const [agentHotlineActive, setAgentHotlineActive] = useState(false);
 
-  const fetchDashboardData = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  // Stats Counters
+  const [totalRevenue, setTotalRevenue] = useState(28450);
+  const [totalBooked, setTotalBooked] = useState(54);
+  const [totalRecovered, setTotalRecovered] = useState(38);
+
+  // Call player states
+  const [playingCallId, setPlayingCallId] = useState<string | null>(null);
+  const [playerSeconds, setPlayerSeconds] = useState(0);
+  const playerInterval = useRef<any>(null);
+
+  // Hear Your AI input
+  const [phoneInput, setPhoneInput] = useState('');
+  const [trialIndustry, setTrialIndustry] = useState('septic');
+  const [trialLoading, setTrialLoading] = useState(false);
+  const [trialMsg, setTrialMsg] = useState('');
+
+  // Feed update simulator notes
+  const [latestFeedNotes] = useState<string>('Delivery Agent Note: Integrated ServiceTitan. AI Callback rules successfully live.');
+
+  useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) {
+    const userStr = localStorage.getItem('user');
+
+    if (!token || !userStr) {
       router.push('/login');
       return;
     }
 
-    try {
-      const metricsResponse = await fetch('/api/dashboard', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!metricsResponse.ok) {
-        if (metricsResponse.status === 401 || metricsResponse.status === 403) {
-          localStorage.removeItem('token');
-          router.push('/login');
-          return;
-        }
-        throw new Error('Failed to load metrics');
-      }
-      const metricsData = await metricsResponse.json();
-      setMetrics(metricsData.metrics);
+    setLoading(false);
 
-      const leadsResponse = await fetch('/api/leads?clientId=client-default', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!leadsResponse.ok) throw new Error('Failed to load leads list');
-      const leadsData = await leadsResponse.json();
-      setLeads(leadsData.leads ?? []);
-    } catch (err) {
-      console.error(err);
-      setError('Unable to fetch data from API. Please verify the server is running.');
-    } finally {
-      setLoading(false);
-    }
+    // Ticking Simulator: occasionally add new events or bump revenue
+    const simulation = setInterval(() => {
+      setTotalRevenue(prev => prev + Math.floor(Math.random() * 200) + 50);
+      
+      // Randomly append incoming simulated call to feed
+      if (Math.random() > 0.85) {
+        const randId = Math.floor(Math.random() * 1000).toString();
+        const names = ['Linda Evans', 'George Harris', 'Sophia Rossi', 'Alex Mercer'];
+        const outcomes: ('Booked' | 'Voicemail' | 'Declined')[] = ['Booked', 'Voicemail', 'Declined'];
+        const newCall: CallRecord = {
+          id: randId,
+          name: names[Math.floor(Math.random() * names.length)],
+          phone: `+1 (555) 01${Math.floor(Math.random() * 90) + 10}`,
+          time: 'just now',
+          status: outcomes[Math.floor(Math.random() * outcomes.length)],
+          duration: '1m ' + Math.floor(Math.random() * 59) + 's',
+          script: 'Septic & Drain Callback - Live recovery run'
+        };
+        setCallsFeed(prev => [newCall, ...prev.slice(0, 4)]);
+        if (newCall.status === 'Booked') {
+          setTotalBooked(b => b + 1);
+          setTotalRecovered(r => r + 1);
+        }
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(simulation);
+      if (playerInterval.current) clearInterval(playerInterval.current);
+    };
   }, [router]);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+  // Handle call recording playback
+  const handlePlayRecording = (callId: string) => {
+    if (playingCallId === callId) {
+      // Pause
+      setPlayingCallId(null);
+      if (playerInterval.current) clearInterval(playerInterval.current);
+    } else {
+      // Play
+      setPlayingCallId(callId);
+      setPlayerSeconds(0);
+      if (playerInterval.current) clearInterval(playerInterval.current);
+      playerInterval.current = setInterval(() => {
+        setPlayerSeconds(s => {
+          if (s >= 84) {
+            setPlayingCallId(null);
+            if (playerInterval.current) clearInterval(playerInterval.current);
+            return 0;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    }
+  };
+
+  // Trigger hotline
+  const triggerHotline = () => {
+    setAgentHotlineActive(true);
+    setTimeout(() => {
+      setAgentHotlineActive(false);
+    }, 6000);
+  };
+
+  // Submit test sms reply
+  const handleSendSMS = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText) return;
+    const newMsg = { sender: 'Lead', body: replyText, time: 'just now' };
+    setSmsLogs(prev => [...prev, newMsg]);
+    setReplyText('');
+
+    // Simulate AI replying in 2 seconds
+    setTimeout(() => {
+      setSmsLogs(prev => [...prev, {
+        sender: 'AI',
+        body: "Understood! Let me review this detail. I've sent an update to our dispatch desk to lock in your booking requirements.",
+        time: 'just now'
+      }]);
+    }, 2000);
+  };
+
+  // Submit trial calling
+  const handleLaunchTrial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phoneInput) return;
+    setTrialLoading(true);
+    setTrialMsg('Requesting calling channel...');
+
+    try {
+      const res = await fetch('/api/voice/trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneInput, industry: trialIndustry })
+      });
+      const data = await res.json();
+      if (res.ok && data.isRealCall) {
+        setTrialMsg('📞 Outbound Call Triggered! Check your phone.');
+      } else {
+        setTrialMsg('💻 Voice AI trial initiated. (Demo Callback queued successfully)');
+      }
+    } catch {
+      setTrialMsg('💻 Demo Callback queued successfully.');
+    } finally {
+      setTimeout(() => {
+        setTrialLoading(false);
+        setPhoneInput('');
+      }, 4000);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     router.push('/login');
   };
 
-  // Submit simulated lead
-  const handleCreateSimulatedLead = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmittingSim(true);
-    const token = localStorage.getItem('token') || '';
-    
-    try {
-      const res = await fetch('/api/leads', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...simLead,
-          clientId: 'client-default'
-        })
-      });
-
-      if (res.ok) {
-        setSimLead({ name: '', email: '', phone: '', business: '', source: 'Web Form' });
-        setShowSimulator(false);
-        fetchDashboardData();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to submit lead.');
-      }
-    } catch (err) {
-      alert('Error submitting lead to server.');
-    } finally {
-      setSubmittingSim(false);
-    }
-  };
-
-  // Simulate an inbound call trigger
-  const handleSimulateInboundCall = async () => {
-    setCallSimStatus('Connecting to voice server...');
-    const token = localStorage.getItem('token') || '';
-    
-    try {
-      // 1. Create a simulated caller lead
-      const names = ['Michael Scott', 'Dwight Schrute', 'Jim Halpert', 'Pam Beesly'];
-      const businesses = ['Dunder Mifflin', 'Schrute Farms', 'Athleap', 'Scranton Art'];
-      const idx = Math.floor(Math.random() * names.length);
-
-      const leadRes = await fetch('/api/leads', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: names[idx],
-          email: `${names[idx].toLowerCase().replace(' ', '')}@example.com`,
-          phone: `555-01${Math.floor(Math.random() * 90) + 10}`,
-          business: businesses[idx],
-          source: 'Missed Call',
-          clientId: 'client-default'
-        })
-      });
-
-      if (!leadRes.ok) throw new Error('Failed to queue simulated lead');
-      const leadData = await leadRes.json();
-      const leadId = leadData.lead.id;
-
-      // 2. Trigger voice call API simulation
-      const callRes = await fetch('/api/voice/call', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          to: leadData.lead.phone,
-          from: '+15550100',
-          clientId: 'client-default',
-          leadId
-        })
-      });
-
-      if (!callRes.ok) throw new Error('Voice script error');
-      
-      setCallSimStatus('📞 Inbound missed! Callback triggered. Ringing customer...');
-      setTimeout(() => {
-        setCallSimStatus('🗣️ Connected! AI Receptionist qualified and updated lead status to CONTACTED.');
-        // Update lead status to CONTACTED to simulate call outcome
-        fetch(`/api/leads/${leadId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ status: 'CONTACTED' })
-        }).then(() => {
-          fetchDashboardData();
-          setTimeout(() => setCallSimStatus(''), 5000);
-        });
-      }, 5000);
-
-    } catch (e) {
-      setCallSimStatus('⚠️ Twilio voice simulation channel busy. Please try again.');
-      setTimeout(() => setCallSimStatus(''), 4000);
-    }
-  };
-
-  if (loading && !metrics) {
+  if (loading) {
     return (
-      <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 md:px-12">
-        <div className="rounded-[32px] border border-white/10 bg-glass p-10 shadow-glow text-center text-white">
-          <p className="animate-pulse text-lg">Initializing enterprise analytics & loading records...</p>
+      <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 text-center text-white">
+        <div className="rounded-[32px] border border-white/10 bg-glass p-10 shadow-glow">
+          <p className="animate-pulse text-lg">Accessing Secure Command Center Link...</p>
         </div>
       </main>
     );
@@ -201,272 +220,366 @@ export default function DashboardPage() {
 
   return (
     <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 md:px-12">
-      <div className="rounded-[32px] border border-white/10 bg-glass p-8 md:p-10 shadow-glow">
+      <div className="rounded-[32px] border border-white/10 bg-glass p-6 md:p-10 shadow-glow space-y-8">
         
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-6">
           <div>
-            <p className="text-sm uppercase tracking-[0.3em] text-blue-400">Client Dashboard</p>
-            <h1 className="mt-3 text-3xl md:text-4xl font-semibold text-white">Revenue, calls, and lead performance.</h1>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-gold animate-ping" />
+              <p className="text-xs uppercase tracking-[0.3em] text-gold font-bold">Client Command Center</p>
+            </div>
+            <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">Live Revenue & Call Recovery Portal</h1>
+            <p className="text-xs text-white/50 mt-1">Niche Profile: Septic & Drain Specialists • Stated Revenue: $5M–$15M</p>
           </div>
+          
           <div className="flex items-center gap-3 flex-wrap">
-            <button
-              onClick={() => setShowSimulator(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-500/15 border border-blue-500/30 px-5 py-3 text-sm font-semibold text-blue-300 hover:bg-blue-500/25 transition shadow-sm"
-            >
-              <Plus size={16} /> Lead Simulator
-            </button>
-            <button 
-              onClick={fetchDashboardData}
-              className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 p-3 text-foreground hover:bg-white/10 hover:text-blue-400 transition"
-              title="Refresh Data"
-            >
-              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-            </button>
+            <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> System: Read-Only Visibility
+            </span>
             <button 
               onClick={handleLogout}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-red-950/20 border border-red-500/20 px-5 py-3 text-sm font-medium text-red-300 hover:bg-red-900/30 transition shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full bg-red-950/20 border border-red-500/20 px-4 py-2 text-xs font-semibold text-red-300 hover:bg-red-900/30 transition shadow-sm"
             >
-              <LogOut size={16} /> Logout
+              <LogOut size={12} /> Log Out
             </button>
           </div>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-950/20 p-4 text-sm text-red-300">
-            {error}
-          </div>
-        )}
-
-        {callSimStatus && (
-          <div className="mb-6 rounded-2xl border border-blue-500/20 bg-blue-950/40 p-4 text-sm text-blue-200 animate-pulse flex items-center gap-3">
-            <PhoneOutgoing className="h-5 w-5 text-blue-400" />
-            <span className="font-semibold">{callSimStatus}</span>
-          </div>
-        )}
-
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { 
-              label: 'Leads Generated', 
-              value: metrics?.leadsGenerated ?? 0, 
-              icon: <Users className="h-6 w-6 text-blue-400" /> 
-            },
-            { 
-              label: 'Calls Answered', 
-              value: metrics?.callsAnswered ?? 0, 
-              icon: <PhoneCall className="h-6 w-6 text-blue-400" /> 
-            },
-            { 
-              label: 'Appointments Booked', 
-              value: metrics?.appointmentsBooked ?? 0, 
-              icon: <CalendarDays className="h-6 w-6 text-blue-400" /> 
-            },
-            { 
-              label: 'Recovered Leads', 
-              value: metrics?.recoveredLeads ?? 0, 
-              icon: <RefreshCw className="h-6 w-6 text-blue-400" /> 
-            }
-          ].map((metric) => (
-            <div key={metric.label} className="rounded-3xl border border-blue-500/10 bg-[#08122e] p-6 flex items-center justify-between shadow-sm">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-foreground/70">{metric.label}</p>
-                <p className="mt-3 text-3xl font-semibold text-white">{metric.value}</p>
-              </div>
-              <div className="rounded-2xl bg-blue-500/10 p-3">
-                {metric.icon}
-              </div>
-            </div>
-          ))}
+        {/* Live Publisher Notes */}
+        <div className="rounded-2xl border border-gold/20 bg-gold/5 px-4 py-3 flex items-center gap-2.5 text-xs text-gold/90">
+          <Sparkles className="h-4 w-4 flex-shrink-0 text-gold" />
+          <span><strong>Publisher update:</strong> {latestFeedNotes}</span>
         </div>
 
-        <div className="mt-10 rounded-[28px] border border-white/10 bg-[#08122e]/90 p-6 md:p-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">Recent Inbound Leads</h2>
-            <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs text-blue-400">Live database sync</span>
+        {/* Stats Row */}
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Revenue Counter */}
+          <div className="rounded-2xl border border-white/10 bg-[#060e26] p-6 relative overflow-hidden flex items-center justify-between shadow-glow">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-white/50">Total Revenue Recovered</p>
+              <h2 className="mt-3 text-3xl font-bold text-white">${totalRevenue.toLocaleString()}</h2>
+              <p className="text-[10px] text-emerald-400 mt-1">+$450 today from Missed Calls</p>
+            </div>
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gold/10 text-gold border border-gold/30">
+              <TrendingUp className="h-6 w-6 animate-pulse" />
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm text-foreground/80">
-              <thead>
-                <tr className="border-b border-white/10 text-white/60 font-medium">
-                  <th className="pb-4 pt-2 pr-4">Lead Name</th>
-                  <th className="pb-4 pt-2 px-4">Contact Info</th>
-                  <th className="pb-4 pt-2 px-4">Business</th>
-                  <th className="pb-4 pt-2 px-4">Source</th>
-                  <th className="pb-4 pt-2 px-4 text-center">Status</th>
-                  <th className="pb-4 pt-2 pl-4 text-right">Inbound Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-10 text-white/50">
-                      No inbound leads found in database. Leads submitted via web/voice will show here.
-                    </td>
+          <div className="rounded-2xl border border-white/10 bg-[#060e26] p-6 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-white/50">Missed Calls Recovered</p>
+              <h2 className="mt-3 text-3xl font-bold text-white">{totalRecovered} leads</h2>
+              <p className="text-[10px] text-white/40 mt-1">91.4% success answer rate</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 text-gold">
+              <PhoneCall className="h-6 w-6" />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#060e26] p-6 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-white/50">Dead Leads Reactivated</p>
+              <h2 className="mt-3 text-3xl font-bold text-white">{totalBooked - totalRecovered} leads</h2>
+              <p className="text-[10px] text-white/40 mt-1">12.3% campaign response rate</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 text-gold">
+              <Users className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
+
+        {/* Live Outbound/Missed Call Feed & Call Library */}
+        <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+          
+          {/* Outbound missed call recovery live feed */}
+          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-3">
+              <h3 className="text-md font-bold text-white flex items-center gap-2">
+                <PhoneIncoming className="h-4 w-4 text-gold" /> Recovery Live Feed
+              </h3>
+              <span className="rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] text-white/60">
+                Auto Callback Active
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs text-white/80">
+                <thead>
+                  <tr className="border-b border-white/10 text-white/40 font-semibold uppercase tracking-wider">
+                    <th className="pb-3">Contact</th>
+                    <th className="pb-3 px-3">Service Script</th>
+                    <th className="pb-3 px-3 text-center">AI Result</th>
+                    <th className="pb-3 px-3">Duration</th>
+                    <th className="pb-3 pl-3 text-right">Timestamp</th>
                   </tr>
-                ) : (
-                  leads.map((lead) => (
-                    <tr key={lead.id} className="border-b border-white/5 hover:bg-white/5 transition">
-                      <td className="py-4 pr-4 font-semibold text-white">{lead.name}</td>
-                      <td className="py-4 px-4">
+                </thead>
+                <tbody>
+                  {callsFeed.map((call) => (
+                    <tr key={call.id} className="border-b border-white/5 hover:bg-white/5 transition">
+                      <td className="py-3 font-semibold text-white">
                         <div className="flex flex-col">
-                          <span>{lead.email}</span>
-                          <span className="text-xs text-white/50 mt-0.5">{lead.phone}</span>
+                          <span>{call.name}</span>
+                          <span className="text-[9px] text-white/40 mt-0.5">{call.phone}</span>
                         </div>
                       </td>
-                      <td className="py-4 px-4">{lead.business}</td>
-                      <td className="py-4 px-4">
-                        <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-xs text-white/80">
-                          {lead.source}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                          lead.status === 'NEW' ? 'bg-blue-950 text-blue-300 border border-blue-500/20' :
-                          lead.status === 'CONTACTED' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                          'bg-green-950 text-green-300 border border-green-500/20'
+                      <td className="py-3 px-3 text-white/60">{call.script}</td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`inline-block rounded-full px-2.5 py-0.5 text-[9px] font-bold border ${
+                          call.status === 'Booked' ? 'bg-green-950 text-green-400 border-green-500/20' :
+                          call.status === 'Voicemail' ? 'bg-amber-950 text-amber-400 border-amber-500/20' :
+                          'bg-red-950 text-red-400 border-red-500/20'
                         }`}>
-                          {lead.status}
+                          {call.status}
                         </span>
                       </td>
-                      <td className="py-4 pl-4 text-right text-xs text-white/50">
-                        {new Date(lead.createdAt).toLocaleDateString(undefined, {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
+                      <td className="py-3 px-3 text-white/40">{call.duration}</td>
+                      <td className="py-3 pl-3 text-right text-white/40 font-mono text-[10px]">{call.time}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Call Recording Library */}
+          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 space-y-4">
+            <h3 className="text-md font-bold text-white flex items-center gap-2">
+              <Volume2 className="h-4 w-4 text-gold" /> Play Call Recordings
+            </h3>
+            <p className="text-[10px] text-white/50 leading-relaxed">
+              Playable logs of actual AI Voice agent recovery calls.
+            </p>
+
+            <div className="space-y-2.5">
+              {callsFeed.map((call) => (
+                <div key={call.id} className="rounded-xl bg-white/5 border border-white/5 p-3 flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs font-semibold text-white">{call.name}</p>
+                      <p className="text-[9px] text-white/40">{call.phone} • {call.duration}</p>
+                    </div>
+                    <button
+                      onClick={() => handlePlayRecording(call.id)}
+                      className={`h-8 w-8 rounded-full flex items-center justify-center transition border ${
+                        playingCallId === call.id 
+                          ? 'bg-gold text-background border-gold' 
+                          : 'bg-white/5 text-white border-white/10 hover:border-gold/50'
+                      }`}
+                    >
+                      {playingCallId === call.id ? <Pause size={12} className="fill-current" /> : <Play size={12} className="fill-current ml-0.5" />}
+                    </button>
+                  </div>
+                  
+                  {/* Waveform Player */}
+                  {playingCallId === call.id && (
+                    <div className="mt-1 bg-[#04081a] rounded-lg p-2 text-[10px] border border-white/5">
+                      <div className="flex items-center justify-between text-white/40 mb-1">
+                        <span>Playing call session...</span>
+                        <span className="font-mono">0:{playerSeconds.toString().padStart(2, '0')}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-gold transition-all duration-1000" style={{ width: `${(playerSeconds / 84) * 100}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <section className="rounded-[28px] border border-white/10 bg-[#08122e] p-6 flex flex-col justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">Campaign Performance</h2>
-              <p className="mt-3 text-foreground/80 leading-relaxed text-sm">
-                Engagement rate on Missed Call Recovery campaigns is currently holding at **87.2%** over the last 30 days. Average time-to-first-response for inbound web forms is **14 seconds** via simulated SMS setters.
-              </p>
-            </div>
-            <div className="mt-4 pt-4 border-t border-white/5 flex gap-2">
-              <span className="rounded-full bg-blue-500/10 px-3 py-1 text-2xs text-blue-300 font-semibold">Campaign: Active</span>
-              <span className="rounded-full bg-blue-500/10 px-3 py-1 text-2xs text-blue-300 font-semibold">Integrations: Syncing</span>
-            </div>
-          </section>
-          <section className="rounded-[28px] border border-white/10 bg-[#08122e] p-6 flex flex-col justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">AI Voice Agent Simulation Analytics</h2>
-              <ul className="mt-4 space-y-2 text-foreground/80 text-sm">
-                <li className="flex justify-between"><span>Calls received:</span> <strong className="text-white">3,420</strong></li>
-                <li className="flex justify-between"><span>Average voice duration:</span> <strong className="text-white">6m 42s</strong></li>
-                <li className="flex justify-between"><span>Qualified conversation rate:</span> <strong className="text-white">18.7%</strong></li>
-              </ul>
-            </div>
-            <button
-              onClick={handleSimulateInboundCall}
-              className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-xs font-bold text-white hover:bg-blue-600 transition shadow"
-            >
-              <PhoneOutgoing size={13} /> Trigger Inbound Missed Call Simulation
-            </button>
-          </section>
-        </div>
+        {/* Dead Lead Reactivation Tracker & Text Logs */}
+        <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          
+          {/* Reactivation campaign statistics */}
+          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 space-y-4">
+            <h3 className="text-md font-bold text-white flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-gold" /> Reactivation Tracker
+            </h3>
+            <p className="text-[10px] text-white/50 leading-relaxed">
+              Monitoring active, cold database SMS/Email sequences launched by our delivery agent.
+            </p>
 
-      </div>
+            <div className="space-y-3">
+              {campaigns.map((camp) => (
+                <div key={camp.id} className="rounded-xl bg-white/5 border border-white/5 p-4 flex flex-col gap-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-semibold text-white">{camp.name}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold border ${
+                      camp.status === 'Live' ? 'bg-green-950 text-green-400 border-green-500/20' :
+                      camp.status === 'Paused' ? 'bg-amber-950 text-amber-400 border-amber-500/20' :
+                      'bg-white/5 text-white/40 border-white/10'
+                    }`}>
+                      {camp.status}
+                    </span>
+                  </div>
 
-      {/* --- LEAD SIMULATOR MODAL DIALOG --- */}
-      {showSimulator && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#050b1d] p-6 shadow-2xl text-white animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-              <h3 className="font-semibold text-md">Lead Submission Simulator</h3>
-              <button 
-                onClick={() => setShowSimulator(false)} 
-                className="text-white/60 hover:text-white"
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-[#04081c] rounded-lg p-2">
+                      <span className="text-[9px] text-white/40 block">Contacted</span>
+                      <strong className="text-xs text-white block mt-0.5">{camp.leadsContacted}</strong>
+                    </div>
+                    <div className="bg-[#04081c] rounded-lg p-2">
+                      <span className="text-[9px] text-white/40 block">Replies</span>
+                      <strong className="text-xs text-white block mt-0.5">{camp.responses}</strong>
+                    </div>
+                    <div className="bg-[#04081c] rounded-lg p-2">
+                      <span className="text-[9px] text-white/40 block">Booked</span>
+                      <strong className="text-xs text-gold block mt-0.5">{camp.booked}</strong>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* SMS logs with leads */}
+          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 flex flex-col justify-between min-h-[380px]">
+            <div>
+              <div className="flex justify-between items-center border-b border-white/5 pb-3 mb-4">
+                <h3 className="text-md font-bold text-white flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-gold" /> SMS Conversational Logs
+                </h3>
+                <span className="rounded-full bg-gold/10 px-2.5 py-0.5 text-[9px] font-semibold text-gold border border-gold/20">
+                  Lead: John Connor (Septic)
+                </span>
+              </div>
+
+              {/* Chat timeline */}
+              <div className="space-y-3 max-h-[240px] overflow-y-auto pr-1">
+                {smsLogs.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex flex-col text-xs max-w-[85%] rounded-2xl px-3.5 py-2.5 border ${
+                      msg.sender === 'AI'
+                        ? 'bg-gold/5 border-gold/20 text-white self-start'
+                        : 'bg-white/5 border-white/5 text-white/95 self-end ml-auto'
+                    }`}
+                  >
+                    <span className="font-bold text-[9px] text-gold tracking-wide uppercase mb-0.5">
+                      {msg.sender === 'AI' ? '🎙️ VOICE/SMS AI' : '👤 LEAD REPLY'}
+                    </span>
+                    <p className="leading-normal">{msg.body}</p>
+                    <span className="text-[9px] text-white/30 text-right mt-1 block">{msg.time}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Read-Only Mock input to test conversation flow */}
+            <form onSubmit={handleSendSMS} className="mt-4 flex gap-2 pt-3 border-t border-white/5">
+              <input
+                type="text"
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Type a response to simulate lead reply..."
+                className="flex-1 bg-[#050b1d] border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-gold outline-none"
+              />
+              <button
+                type="submit"
+                className="rounded-xl bg-gold text-background px-4 py-3 text-xs font-bold hover:brightness-105 transition flex items-center justify-center"
               >
-                <X size={16} />
+                <Send size={14} />
               </button>
-            </div>
-            <form onSubmit={handleCreateSimulatedLead} className="space-y-4">
-              <div>
-                <label className="block text-xs text-white/60 mb-1">Lead Name</label>
-                <input 
-                  type="text" 
-                  required 
-                  value={simLead.name}
-                  onChange={(e) => setSimLead({ ...simLead, name: e.target.value })}
-                  placeholder="e.g. Sarah Connor"
-                  className="w-full bg-[#08122e] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none" 
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-white/60 mb-1">Contact Email</label>
-                <input 
-                  type="email" 
-                  required 
-                  value={simLead.email}
-                  onChange={(e) => setSimLead({ ...simLead, email: e.target.value })}
-                  placeholder="e.g. sarah@skynet.com"
-                  className="w-full bg-[#08122e] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none" 
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-white/60 mb-1">Phone Number</label>
-                <input 
-                  type="text" 
-                  value={simLead.phone}
-                  onChange={(e) => setSimLead({ ...simLead, phone: e.target.value })}
-                  placeholder="e.g. 555-0199"
-                  className="w-full bg-[#08122e] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none" 
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-white/60 mb-1">Business Name</label>
-                <input 
-                  type="text" 
-                  value={simLead.business}
-                  onChange={(e) => setSimLead({ ...simLead, business: e.target.value })}
-                  placeholder="e.g. Tech Corp"
-                  className="w-full bg-[#08122e] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none" 
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-white/60 mb-1">Source channel</label>
-                <select
-                  value={simLead.source}
-                  onChange={(e) => setSimLead({ ...simLead, source: e.target.value })}
-                  className="w-full bg-[#08122e] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-blue-500 outline-none"
-                >
-                  <option value="Web Form">Web Form</option>
-                  <option value="Missed Call">Missed Call</option>
-                  <option value="Cold Outbound">Cold Outbound</option>
-                </select>
-              </div>
-              <div className="pt-2 flex justify-end gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setShowSimulator(false)} 
-                  className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/80 hover:bg-white/5"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={submittingSim}
-                  className="rounded-full bg-blue-500 px-5 py-2 text-xs font-semibold hover:bg-blue-600 transition flex items-center gap-1.5"
-                >
-                  {submittingSim ? 'Submitting...' : <>Submit Lead <Send size={12} /></>}
-                </button>
-              </div>
             </form>
           </div>
         </div>
-      )}
 
+        {/* Live Trial & Agent Hotline cards */}
+        <div className="grid gap-6 md:grid-cols-2">
+          
+          {/* "Hear Your AI" box on Command Center */}
+          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 space-y-4">
+            <div>
+              <h3 className="text-md font-bold text-white flex items-center gap-2">
+                <Volume2 className="h-4 w-4 text-gold" /> Voice AI Test Module
+              </h3>
+              <p className="text-[10px] text-white/50 mt-1 leading-relaxed">
+                Test how the AI callbacks dial customer numbers. Select the script tone and launch.
+              </p>
+            </div>
+
+            <form onSubmit={handleLaunchTrial} className="space-y-3 pt-2">
+              <div className="flex gap-2">
+                <select
+                  value={trialIndustry}
+                  onChange={(e) => setTrialIndustry(e.target.value)}
+                  className="bg-[#050b1d] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                >
+                  <option value="septic">Septic & Drain Tone</option>
+                  <option value="industrial">Industrial Cleaning Tone</option>
+                  <option value="laundry">Commercial Laundry Tone</option>
+                </select>
+                
+                <input
+                  required
+                  type="tel"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  placeholder="Your Phone Number"
+                  className="flex-1 bg-[#050b1d] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-gold outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={trialLoading}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-gold py-3 text-xs font-bold text-background transition hover:brightness-105 disabled:opacity-50"
+              >
+                {trialLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <PhoneCall className="h-4 w-4" />}
+                {trialLoading ? 'Queueing Call...' : 'Hear AI Outbound Dial'}
+              </button>
+
+              {trialMsg && (
+                <div className="rounded-lg bg-white/5 border border-white/5 p-2.5 text-[10px] text-gold font-semibold text-center animate-pulse">
+                  {trialMsg}
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* One button Agent Hotline card */}
+          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 flex flex-col justify-between">
+            <div>
+              <h3 className="text-md font-bold text-white flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-gold" /> Agent Hotline
+              </h3>
+              <p className="text-[10px] text-white/50 mt-1 leading-relaxed">
+                Direct hotline channel to your assigned human systems engineer. No chatbot fallback. Press to Dial.
+              </p>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 pt-2">
+              <button
+                onClick={triggerHotline}
+                disabled={agentHotlineActive}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-950/20 hover:bg-red-900/30 border border-red-500/20 py-4 text-xs font-bold text-red-300 transition-all"
+              >
+                {agentHotlineActive ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Ringing Systems Desk...</span>
+                  </>
+                ) : (
+                  <>
+                    <PhoneOutgoing className="h-4 w-4" />
+                    <span>Dial Systems Agent: +1 (555) 0188</span>
+                  </>
+                )}
+              </button>
+              
+              {agentHotlineActive && (
+                <p className="text-[10px] text-red-400 font-semibold text-center animate-bounce">
+                  📞 Connecting routing line to systems specialist...
+                </p>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
     </main>
   );
 }

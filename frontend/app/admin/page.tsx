@@ -1,112 +1,82 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { 
-  Users, PhoneCall, CalendarDays, RefreshCw, Settings, BookOpen, 
-  ShieldCheck, BarChart3, LogOut, X, Plus, Trash2 
+  Users, PhoneCall, LogOut, X, Plus, Sliders, 
+  Upload, Link2, MessageSquare, AlertTriangle, PlayCircle
 } from 'lucide-react';
 
-interface Lead {
+interface Client {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
-  business: string;
+  companyName: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  plan: string;
+  industry: string;
+  revenueBracket: string;
   status: string;
-  source: string;
-  createdAt: string;
 }
 
-interface MetricData {
-  totalLeads: number;
-  appointmentsBooked: number;
-  callsAnswered: number;
-}
-
-const adminActions = [
-  { id: 'manage-clients', icon: <Users className="h-5 w-5 text-gold" />, title: 'Manage Clients', desc: 'View, add, or suspend client accounts.' },
-  { id: 'view-analytics', icon: <BarChart3 className="h-5 w-5 text-gold" />, title: 'View Analytics', desc: 'Revenue, calls, and campaign performance.' },
-  { id: 'review-leads', icon: <PhoneCall className="h-5 w-5 text-gold" />, title: 'Review Leads', desc: 'Incoming leads from all channels.' },
-  { id: 'approve-appointments', icon: <CalendarDays className="h-5 w-5 text-gold" />, title: 'Approve Appointments', desc: 'Confirm scheduled consultations.' },
-  { id: 'train-chatbot', icon: <BookOpen className="h-5 w-5 text-gold" />, title: 'Train Chatbot', desc: 'Add knowledge base entries and scripts.' },
-  { id: 'adjust-scripts', icon: <Settings className="h-5 w-5 text-gold" />, title: 'Adjust AI Scripts', desc: 'Update voice agent call scripts.' },
+const initialClients: Client[] = [
+  { id: 'client-default', companyName: 'Septic & Drain Specialists', contactName: 'John Doe', contactEmail: 'john@example.com', contactPhone: '555-0188', plan: 'DOMINANCE', industry: 'Septic & Drain', revenueBracket: '$5M–$15M', status: 'ACTIVE' },
+  { id: 'client-2', companyName: 'Industrial Jetting Corp', contactName: 'Sarah Miller', contactEmail: 'sarah@jetting.com', contactPhone: '555-0144', plan: 'GROWTH', industry: 'Industrial Cleaning', revenueBracket: '$8M–$40M', status: 'ACTIVE' },
+  { id: 'client-3', companyName: 'Northeast Hospital Linen', contactName: 'David Chen', contactEmail: 'dchen@hospital-linen.com', contactPhone: '555-0199', plan: 'STARTER', industry: 'Commercial Laundry', revenueBracket: '$5M–$25M', status: 'ACTIVE' }
 ];
 
-export default function AdminPage() {
+export default function AgentDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [leadsLoading, setLeadsLoading] = useState(false);
-  const [metrics, setMetrics] = useState<MetricData | null>(null);
+  const [activeTab, setActiveTab] = useState<'clients' | 'voice' | 'engine' | 'reactivation' | 'crm' | 'inbox'>('clients');
 
-  // Active module modal ID
-  const [activeModal, setActiveModal] = useState<string | null>(null);
+  // Client Manager State
+  const [clients, setClients] = useState<Client[]>(initialClients);
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [newClient, setNewClient] = useState({ companyName: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'GROWTH', industry: 'Septic & Drain', revenueBracket: '$5M–$15M' });
 
-  // Data states for modules
-  const [clientsList, setClientsList] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
+  // AI Voice Builder State
+  const [selectedVoiceIndustry, setSelectedVoiceIndustry] = useState('septic');
+  const [callScript, setCallScript] = useState(`[Niche: Septic & Drain Callback Script]
+- Trigger: Outbound dial within 10 seconds of a missed call.
+- Introduction: "Hey there! This is the callback assistant for Septic Specialists. We saw we just missed a call from this number a few seconds ago and wanted to get right back to you. Did we catch you at a good time?"
+- Core Goal: Qualify whether they need emergency backing-up clearing, septic pumping, or grease trap service.
+- Call Action: If qualified, sync call data to ServiceTitan CRM, schedule dispatch booking, and send confirmation SMS link.`);
   
-  // Custom chatbot training context
-  const [kbEntries, setKbEntries] = useState<{ q: string; a: string }[]>([]);
-  const [newQ, setNewQ] = useState('');
-  const [newA, setNewA] = useState('');
-  
-  // Custom call scripts
-  const [voiceScript, setVoiceScript] = useState('');
+  // Script changes confirmation notice
+  const [scriptSaved, setScriptSaved] = useState(false);
 
-  // Forms
-  const [showAddClientModal, setShowAddClientModal] = useState(false);
-  const [newClient, setNewClient] = useState({ companyName: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'GROWTH' });
+  // Missed Call Engine State
+  const [liveMissedCalls] = useState([
+    { id: 'm1', name: 'Linda Harris', phone: '+1 (555) 0134', status: 'AI Callback Initiating...', active: true },
+    { id: 'm2', name: 'Robert Chen', phone: '+1 (555) 0187', status: 'Booked in CRM', active: false },
+    { id: 'm3', name: 'James Evans', phone: '+1 (555) 0104', status: 'Answered (Take Over Available)', active: true }
+  ]);
+  const [agentListeningId, setAgentListeningId] = useState<string | null>(null);
+  const [takeOverActiveId, setTakeOverActiveId] = useState<string | null>(null);
 
-  const fetchConfigs = useCallback(async (token: string) => {
-    try {
-      const res = await fetch('/api/admin/configs', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setKbEntries(data.kbEntries || []);
-        setVoiceScript(data.voiceScript || '');
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
+  // Reactivation Launcher State
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvUploadStatus, setCsvUploadStatus] = useState('');
+  const [selectedCampaignTemplate, setSelectedCampaignTemplate] = useState('septic-stale');
+  const [reactivationLogs, setReactivationLogs] = useState([
+    { id: 'l1', campaign: 'Spring Pump-out Campaign', contacted: 140, replies: 18, bookings: 6, date: '2026-06-06' }
+  ]);
 
-  const fetchDashboardData = useCallback(async (token: string) => {
-    try {
-      const metricsResponse = await fetch('/api/dashboard/admin', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (metricsResponse.ok) {
-        const metricsData = await metricsResponse.json();
-        setMetrics(metricsData.metrics);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
+  // CRM Integrations State
 
-  const fetchLeads = useCallback(async (token: string) => {
-    setLeadsLoading(true);
-    try {
-      const res = await fetch('/api/leads?clientId=client-default', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLeads(data.leads ?? []);
-      }
-    } catch {
-      // silently fail — leads table will just be empty
-    } finally {
-      setLeadsLoading(false);
-    }
-  }, []);
+  // Progress Publisher State
+  const [publisherNote, setPublisherNote] = useState('');
+  const [publisherStatus, setPublisherStatus] = useState('');
+
+  // Agent Inbox State
+  const [inboxMessages] = useState([
+    { id: 'in1', clientName: 'Linda Harris', phone: '+1 (555) 0134', message: 'I need a tech tomorrow morning. Standard drain cleaning.', date: '10:14 AM', type: 'SMS' },
+    { id: 'in2', clientName: 'Hospital Route Desk', phone: '+1 (555) 0199', message: 'Can we schedule double delivery on Tuesday?', date: '9:45 AM', type: 'SMS' }
+  ]);
+  const [inboxReplyText, setInboxReplyText] = useState('');
+  const [selectedInboxId, setSelectedInboxId] = useState<string | null>('in1');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -122,20 +92,15 @@ export default function AdminPage() {
       const role = user.role?.toUpperCase?.() || user.role;
       if (role === 'ADMIN' || role === 'SUPERADMIN') {
         setAuthorized(true);
-        if (role === 'SUPERADMIN') setIsSuperAdmin(true);
-        fetchLeads(token);
-        fetchDashboardData(token);
-        fetchConfigs(token);
       } else {
         router.push('/login');
-        return;
       }
     } catch (e) {
       router.push('/login');
     } finally {
       setLoading(false);
     }
-  }, [router, fetchLeads, fetchDashboardData, fetchConfigs]);
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -143,811 +108,694 @@ export default function AdminPage() {
     router.push('/login');
   };
 
-  const refreshData = () => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      fetchLeads(token);
-      fetchDashboardData(token);
-      fetchConfigs(token);
-    }
-  };
-
-  // --- Fetch Module Specific Data ---
-  const loadModuleData = async (moduleId: string) => {
-    const token = localStorage.getItem('token') || '';
-    if (!token) return;
-
-    if (moduleId === 'manage-clients') {
-      try {
-        const res = await fetch('/api/admin/clients', { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const data = await res.json();
-          setClientsList(data.clients || []);
-        }
-      } catch (e) { console.error(e); }
-    } else if (moduleId === 'approve-appointments') {
-      try {
-        const res = await fetch('/api/admin/appointments', { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const data = await res.json();
-          setAppointments(data.appointments || []);
-        }
-      } catch (e) { console.error(e); }
-    }
-  };
-
-  const openAction = (moduleId: string) => {
-    setActiveModal(moduleId);
-    loadModuleData(moduleId);
-  };
-
-  const closeAction = () => {
-    setActiveModal(null);
-  };
-
-  // --- Actions ---
-
-  // Update Lead Status
-  const handleUpdateLeadStatus = async (leadId: string, newStatus: string) => {
-    const token = localStorage.getItem('token') || '';
-    try {
-      const res = await fetch(`/api/leads/${leadId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        fetchLeads(token);
-        fetchDashboardData(token);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Delete Lead
-  const handleDeleteLead = async (leadId: string) => {
-    if (!confirm('Are you sure you want to delete this lead record?')) return;
-    const token = localStorage.getItem('token') || '';
-    try {
-      const res = await fetch(`/api/leads/${leadId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        fetchLeads(token);
-        fetchDashboardData(token);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleToggleSuspendClient = async (client: any) => {
-    const token = localStorage.getItem('token') || '';
-    const newStatus = client.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
-    try {
-      const res = await fetch(`/api/admin/clients/${client.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        loadModuleData('manage-clients');
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleDeleteClient = async (clientId: string) => {
-    if (!confirm('Are you sure you want to delete this client account and all related records?')) return;
-    const token = localStorage.getItem('token') || '';
-    try {
-      const res = await fetch(`/api/admin/clients/${clientId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        loadModuleData('manage-clients');
-        fetchDashboardData(token);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  // Create Client Action
-  const handleAddClient = async (e: React.FormEvent) => {
+  // Onboard client
+  const handleCreateClient = (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem('token') || '';
-    try {
-      const res = await fetch('/api/admin/clients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(newClient)
-      });
-      if (res.ok) {
-        setShowAddClientModal(false);
-        setNewClient({ companyName: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'GROWTH' });
-        loadModuleData('manage-clients');
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Failed to add client');
+    const newId = 'client-' + (clients.length + 1);
+    const added: Client = {
+      id: newId,
+      companyName: newClient.companyName,
+      contactName: newClient.contactName,
+      contactEmail: newClient.contactEmail,
+      contactPhone: newClient.contactPhone,
+      plan: newClient.plan,
+      industry: newClient.industry,
+      revenueBracket: newClient.revenueBracket,
+      status: 'ACTIVE'
+    };
+    setClients(prev => [...prev, added]);
+    setShowAddClient(false);
+    setNewClient({ companyName: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'GROWTH', industry: 'Septic & Drain', revenueBracket: '$5M–$15M' });
+  };
+
+  // Toggle Suspend client
+  const handleToggleSuspend = (clientId: string) => {
+    setClients(prev => prev.map(c => {
+      if (c.id === clientId) {
+        return { ...c, status: c.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED' };
       }
-    } catch (err) {
-      alert('Network error adding client');
+      return c;
+    }));
+  };
+
+  // Save Call Script per Industry
+  const handleSaveScript = () => {
+    setScriptSaved(true);
+    setTimeout(() => setScriptSaved(false), 3000);
+  };
+
+  // Upload Dead Lead list CSV
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCsvFile(file);
+      setCsvUploadStatus('Uploading lead records...');
+      setTimeout(() => {
+        setCsvUploadStatus(`Successfully parsed ${file.name} - 150 contacts detected.`);
+      }, 1500);
     }
   };
 
-  // Approve/Confirm Appointment
-  const handleConfirmAppointment = async (apptId: string, newStatus: string) => {
-    const token = localStorage.getItem('token') || '';
-    try {
-      const res = await fetch(`/api/admin/appointments/${apptId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
-        loadModuleData('approve-appointments');
-      }
-    } catch (e) {
-      console.error(e);
+  // Launch Reactivation Campaign
+  const handleLaunchCampaign = () => {
+    if (!csvFile) {
+      alert('Please upload a lead CSV first.');
+      return;
     }
+    const newCamp = {
+      id: 'l-' + (reactivationLogs.length + 1),
+      campaign: selectedCampaignTemplate === 'septic-stale' ? 'Septic Reactivation Run' : 'Laundry Commercial Outreach',
+      contacted: 150,
+      replies: 0,
+      bookings: 0,
+      date: new Date().toISOString().split('T')[0]
+    };
+    setReactivationLogs(prev => [newCamp, ...prev]);
+    setCsvFile(null);
+    setCsvUploadStatus('Campaign launched! Sequence active.');
+    setTimeout(() => setCsvUploadStatus(''), 4000);
+  };
+
+  // Publish Note to Client Command Center
+  const handlePublishNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!publisherNote) return;
+    setPublisherStatus('Pushing update note to Command Center feed...');
+    setTimeout(() => {
+      setPublisherStatus('Published! Command Center dashboard notes updated.');
+      setPublisherNote('');
+      setTimeout(() => setPublisherStatus(''), 3000);
+    }, 1200);
+  };
+
+  // Send Manual Reply in Inbox
+  const handleInboxReply = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inboxReplyText) return;
+    setInboxReplyText('');
+    alert('Agent reply successfully sent to customer cell number.');
   };
 
   if (loading) {
     return (
-      <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 md:px-12 text-center text-white">
+      <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 text-center text-white">
         <div className="rounded-[32px] border border-white/10 bg-glass p-10 shadow-glow">
-          <p className="animate-pulse text-lg">Verifying administrative access...</p>
+          <p className="animate-pulse text-lg">Verifying administration permissions...</p>
         </div>
       </main>
     );
   }
 
   if (!authorized) {
-    return (
-      <main className="mx-auto mt-28 max-w-md px-6 pb-24">
-        <section className="rounded-[32px] border border-red-500/20 bg-red-950/10 p-10 text-center shadow-glow">
-          <ShieldCheck className="mx-auto h-12 w-12 text-red-400 mb-4" />
-          <p className="text-sm uppercase tracking-[0.3em] text-red-400">Access Denied</p>
-          <h1 className="mt-4 text-2xl font-semibold text-white">Forbidden</h1>
-          <p className="mt-4 text-foreground/80 leading-relaxed">
-            You do not have administrative privileges to access this area.
-          </p>
-          <div className="mt-8">
-            <Link
-              href="/dashboard"
-              className="inline-block rounded-full bg-gold px-8 py-3.5 text-sm font-semibold text-background transition hover:brightness-95"
-            >
-              Back to Dashboard
-            </Link>
-          </div>
-        </section>
-      </main>
-    );
+    return null; // Next router handles redirect
   }
-
-  const systemStats = [
-    { label: 'Total Leads (All Clients)', value: metrics?.totalLeads ?? '...' },
-    { label: 'Appointments Booked', value: metrics?.appointmentsBooked ?? '...' },
-    { label: 'Total Calls Answered', value: metrics?.callsAnswered ?? '...' },
-  ];
 
   return (
     <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 md:px-12">
-      <div className="rounded-[32px] border border-white/10 bg-glass p-8 md:p-10 shadow-glow">
-
+      <div className="rounded-[32px] border border-white/10 bg-glass p-6 md:p-10 shadow-glow space-y-8">
+        
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-6">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-gold/20 bg-gold/5 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-gold mb-3">
-              <ShieldCheck size={12} /> Admin Control Center
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-gold border border-gold/40" />
+              <p className="text-xs uppercase tracking-[0.3em] text-gold font-bold">Agent Dashboard</p>
             </div>
-            <h1 className="text-3xl md:text-4xl font-semibold text-white">Client, lead & analytics management.</h1>
+            <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">Internal Systems & CRM Delivery</h1>
+            <p className="text-xs text-white/50 mt-1">Operational interface to manage clients, voice pipelines, and lead campaigns.</p>
           </div>
-          <div className="flex gap-3 flex-wrap">
-            <button
-              onClick={refreshData}
-              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-foreground transition hover:bg-white/10 hover:text-gold"
-            >
-              <RefreshCw size={15} className={leadsLoading ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-            {isSuperAdmin && (
-              <Link
-                href="/superadmin"
-                className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-2.5 text-sm text-purple-400 transition hover:bg-purple-500/20"
-              >
-                <ShieldCheck size={15} />
-                Superadmin
-              </Link>
-            )}
-            <button
+          
+          <div className="flex items-center gap-3">
+            <button 
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-full bg-red-950/20 border border-red-500/20 px-4 py-2.5 text-sm font-medium text-red-300 hover:bg-red-900/30 transition shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full bg-red-950/20 border border-red-500/20 px-4 py-2.5 text-xs font-semibold text-red-300 hover:bg-red-900/30 transition shadow-sm"
             >
-              <LogOut size={15} /> Logout
+              <LogOut size={13} /> Agent Log Out
             </button>
           </div>
         </div>
 
-        {/* System Stats */}
-        <div className="grid gap-4 sm:grid-cols-3 mb-10">
-          {systemStats.map((stat) => (
-            <div key={stat.label} className="rounded-3xl border border-gold/10 bg-[#08122e] p-5 flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wider text-foreground/60">{stat.label}</p>
-              <p className="text-2xl font-semibold text-white">{stat.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Action Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">
-          {adminActions.map((action) => (
-            <div
-              key={action.id}
-              onClick={() => openAction(action.id)}
-              className="group rounded-3xl border border-white/10 bg-[#08122e] p-5 transition hover:border-gold/20 hover:bg-[#0a1535] cursor-pointer"
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap gap-2 border-b border-white/5 pb-3">
+          {[
+            { id: 'clients', label: 'Client Manager', icon: <Users size={14} /> },
+            { id: 'voice', label: 'AI Voice Builder', icon: <Sliders size={14} /> },
+            { id: 'engine', label: 'Missed Call Engine', icon: <PhoneCall size={14} /> },
+            { id: 'reactivation', label: 'Reactivation Launcher', icon: <Upload size={14} /> },
+            { id: 'crm', label: 'CRM Integrations', icon: <Link2 size={14} /> },
+            { id: 'inbox', label: 'Internal Inbox', icon: <MessageSquare size={14} /> }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold border transition ${
+                activeTab === tab.id
+                  ? 'bg-gold border-gold text-background'
+                  : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+              }`}
             >
-              <div className="flex items-start gap-4">
-                <div className="rounded-2xl bg-gold/10 p-3 mt-0.5 group-hover:bg-gold/20 transition">{action.icon}</div>
-                <div>
-                  <p className="font-semibold text-white text-sm">{action.title}</p>
-                  <p className="mt-1 text-xs text-foreground/60 leading-relaxed">{action.desc}</p>
-                </div>
-              </div>
-            </div>
+              {tab.icon} {tab.label}
+            </button>
           ))}
         </div>
 
-        {/* Leads Table */}
-        <div className="rounded-[28px] border border-white/10 bg-[#08122e]/90 p-6 md:p-8">
-          <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
-            <h2 className="text-xl font-semibold text-white">All Inbound Leads</h2>
-            <span className="rounded-full bg-gold/10 px-3 py-1 text-xs text-gold">
-              {leads.length} record{leads.length !== 1 ? 's' : ''}
-            </span>
-          </div>
+        {/* TAB 1: CLIENT MANAGER */}
+        {activeTab === 'clients' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center flex-wrap gap-2">
+              <div>
+                <h2 className="text-lg font-bold text-white">Client Accounts</h2>
+                <p className="text-xs text-white/50">Manage accounts, industry tones, and revenue brackets.</p>
+              </div>
+              <button
+                onClick={() => setShowAddClient(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gold px-4 py-2 text-xs font-semibold text-background hover:brightness-105 transition"
+              >
+                <Plus size={14} /> Onboard New Client
+              </button>
+            </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm text-foreground/80">
-              <thead>
-                <tr className="border-b border-white/10 text-white/60 font-medium">
-                  <th className="pb-4 pt-2 pr-4">Name</th>
-                  <th className="pb-4 pt-2 px-4">Contact</th>
-                  <th className="pb-4 pt-2 px-4">Business</th>
-                  <th className="pb-4 pt-2 px-4">Source</th>
-                  <th className="pb-4 pt-2 px-4 text-center">Status</th>
-                  <th className="pb-4 pt-2 pl-4 text-right">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leadsLoading ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-white/50 animate-pulse">Loading leads...</td>
+            {/* Clients Table */}
+            <div className="overflow-x-auto rounded-2xl border border-white/10 bg-[#060e26]/50">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/5 text-white/40 font-semibold uppercase tracking-wider">
+                    <th className="p-3">Company</th>
+                    <th className="p-3">Contact</th>
+                    <th className="p-3">Niche Door</th>
+                    <th className="p-3">Revenue Bracket</th>
+                    <th className="p-3 text-center">Plan</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
-                ) : leads.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-10 text-center text-white/50">No leads found in database.</td>
-                  </tr>
-                ) : (
-                  leads.map((lead) => (
-                    <tr key={lead.id} className="border-b border-white/5 hover:bg-white/5 transition">
-                      <td className="py-4 pr-4 font-semibold text-white">{lead.name}</td>
-                      <td className="py-4 px-4">
-                        <div className="flex flex-col">
-                          <span>{lead.email}</span>
-                          <span className="text-xs text-white/50 mt-0.5">{lead.phone}</span>
-                        </div>
+                </thead>
+                <tbody>
+                  {clients.map((c) => (
+                    <tr key={c.id} className="border-b border-white/5 hover:bg-white/5 transition">
+                      <td className="p-3 font-semibold text-white">{c.companyName}</td>
+                      <td className="p-3 text-white/70">{c.contactName} ({c.contactEmail}) • {c.contactPhone}</td>
+                      <td className="p-3 font-medium text-gold">{c.industry}</td>
+                      <td className="p-3 text-white/60">{c.revenueBracket}</td>
+                      <td className="p-3 text-center font-mono font-bold text-white/90">{c.plan}</td>
+                      <td className="p-3 text-center">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold border ${
+                          c.status === 'ACTIVE' 
+                            ? 'bg-green-950 text-green-400 border-green-500/20' 
+                            : 'bg-red-950 text-red-400 border-red-500/20'
+                        }`}>
+                          {c.status}
+                        </span>
                       </td>
-                      <td className="py-4 px-4">{lead.business}</td>
-                      <td className="py-4 px-4">
-                        <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-xs text-white/80">{lead.source}</span>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <select
-                          value={lead.status}
-                          onChange={(e) => handleUpdateLeadStatus(lead.id, e.target.value)}
-                          className="bg-[#050b1d] border border-white/10 rounded px-2.5 py-1 text-xs text-white font-semibold outline-none"
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleToggleSuspend(c.id)}
+                          className={`rounded px-2 py-1 text-[9px] font-bold border transition ${
+                            c.status === 'ACTIVE'
+                              ? 'bg-red-950/20 text-red-400 border-red-500/20 hover:bg-red-950/40'
+                              : 'bg-green-950/20 text-green-400 border-green-500/20 hover:bg-green-950/40'
+                          }`}
                         >
-                          <option value="NEW">NEW</option>
-                          <option value="CONTACTED">CONTACTED</option>
-                          <option value="RECOVERED">RECOVERED</option>
-                        </select>
-                      </td>
-                      <td className="py-4 pl-4 text-right text-xs text-white/50">
-                        {new Date(lead.createdAt).toLocaleDateString(undefined, {
-                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                        })}
+                          {c.status === 'ACTIVE' ? 'Suspend' : 'Activate'}
+                        </button>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* --- MODAL OVERLAYS --- */}
-      {activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-[32px] border border-white/15 bg-[#050b1d] p-6 md:p-8 shadow-2xl overflow-hidden text-white animate-in fade-in zoom-in-95 duration-150">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-              <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-gold/10 p-2 text-gold">
-                  {adminActions.find(a => a.id === activeModal)?.icon}
-                </div>
-                <div>
-                  <h2 className="text-xl font-semibold">{adminActions.find(a => a.id === activeModal)?.title}</h2>
-                  <p className="text-xs text-white/50">{adminActions.find(a => a.id === activeModal)?.desc}</p>
-                </div>
-              </div>
-              <button 
-                onClick={closeAction}
-                className="rounded-full border border-white/10 p-2 text-white/70 hover:bg-white/10 hover:text-white transition"
-              >
-                <X size={16} />
-              </button>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto pr-1">
+            {/* Progress Publisher interface */}
+            <div className="grid gap-6 md:grid-cols-2 pt-4 border-t border-white/5">
+              <div className="rounded-2xl border border-white/10 bg-[#060e26]/40 p-5 space-y-4">
+                <h3 className="text-sm font-bold text-white">Progress Publisher Console</h3>
+                <p className="text-[10px] text-white/50">
+                  Write a message to immediately publish to the client Command Center status banner.
+                </p>
+                <form onSubmit={handlePublishNote} className="space-y-3">
+                  <textarea
+                    required
+                    value={publisherNote}
+                    onChange={(e) => setPublisherNote(e.target.value)}
+                    placeholder="Enter notes (e.g. Completed initial dead list CSV launch. SMS active...)"
+                    className="w-full bg-[#050b1d] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-gold h-20 resize-none"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-gold text-background px-4 py-2 text-xs font-bold hover:brightness-105"
+                  >
+                    Publish to Client Link
+                  </button>
+                </form>
+                {publisherStatus && (
+                  <p className="text-[10px] text-gold font-semibold animate-pulse">{publisherStatus}</p>
+                )}
+              </div>
+            </div>
 
-              {/* 1. MANAGE CLIENTS */}
-              {activeModal === 'manage-clients' && (
-                <div>
-                  <div className="mb-4 flex items-center justify-between">
-                    <h3 className="font-semibold text-white text-md">Client Accounts</h3>
-                    <button
-                      onClick={() => setShowAddClientModal(true)}
-                      className="inline-flex items-center gap-1 rounded-full bg-gold hover:brightness-95 px-4 py-2 text-xs font-semibold text-background transition"
-                    >
-                      <Plus size={14} /> Add Client
-                    </button>
+            {/* Onboard Client Modal */}
+            {showAddClient && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 animate-in fade-in duration-100">
+                <div className="w-full max-w-md rounded-3xl border border-white/15 bg-[#050b1d] p-6 shadow-2xl text-white">
+                  <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-4">
+                    <h3 className="font-bold text-sm">Onboard Client Account</h3>
+                    <button onClick={() => setShowAddClient(false)} className="text-white/60 hover:text-white"><X size={16} /></button>
                   </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-white/5 bg-white/5">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-white/10 bg-white/5 text-white/60 font-medium">
-                          <th className="p-3">Company Name</th>
-                          <th className="p-3">Contact</th>
-                          <th className="p-3">Plan</th>
-                          <th className="p-3">Phone</th>
-                          <th className="p-3 text-center">Status</th>
-                          <th className="p-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {clientsList.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="p-8 text-center text-white/50">Loading clients...</td>
-                          </tr>
-                        ) : (
-                          clientsList.map((client) => (
-                            <tr key={client.id} className="border-b border-white/5 hover:bg-white/5 transition">
-                              <td className="p-3 font-semibold text-white">{client.companyName}</td>
-                              <td className="p-3 text-white/70">{client.contactName} ({client.contactEmail})</td>
-                              <td className="p-3">
-                                <span className="rounded bg-gold/10 border border-gold/25 px-2 py-0.5 text-xs text-gold font-bold">
-                                  {client.plan}
-                                </span>
-                              </td>
-                              <td className="p-3 text-white/50">{client.contactPhone || 'N/A'}</td>
-                              <td className="p-3 text-center">
-                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-2xs font-semibold border ${
-                                  client.status === 'SUSPENDED' 
-                                    ? 'bg-red-950/20 text-red-400 border-red-500/20' 
-                                    : 'bg-green-950/20 text-green-400 border-green-500/20'
-                                }`}>
-                                  {client.status || 'ACTIVE'}
-                                </span>
-                              </td>
-                              <td className="p-3 text-right">
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    onClick={() => handleToggleSuspendClient(client)}
-                                    className={`rounded px-2 py-1 text-2xs border ${
-                                      client.status === 'SUSPENDED' 
-                                        ? 'bg-green-900/10 text-green-400 border-green-500/20 hover:bg-green-900/20' 
-                                        : 'bg-amber-900/10 text-amber-400 border-amber-500/20 hover:bg-amber-900/20'
-                                    }`}
-                                  >
-                                    {client.status === 'SUSPENDED' ? 'Activate' : 'Suspend'}
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteClient(client.id)}
-                                    className="rounded p-1.5 bg-red-900/10 text-red-400 border border-red-500/20 hover:bg-red-900/20"
-                                    title="Delete Client"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Add Client Dialog */}
-                  {showAddClientModal && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
-                      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#070e24] p-6 shadow-xl text-white">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                          <h4 className="font-semibold text-md">Create Client Account</h4>
-                          <button onClick={() => setShowAddClientModal(false)} className="text-white/60 hover:text-white"><X size={15} /></button>
-                        </div>
-                        <form onSubmit={handleAddClient} className="space-y-4">
-                          <div>
-                            <label className="block text-xs text-white/60 mb-1">Company Name</label>
-                            <input 
-                              type="text" 
-                              required 
-                              value={newClient.companyName} 
-                              onChange={(e) => setNewClient({...newClient, companyName: e.target.value})}
-                              className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold outline-none" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-white/60 mb-1">Contact Name</label>
-                            <input 
-                              type="text" 
-                              value={newClient.contactName} 
-                              onChange={(e) => setNewClient({...newClient, contactName: e.target.value})}
-                              className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold outline-none" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-white/60 mb-1">Contact Email</label>
-                            <input 
-                              type="email" 
-                              required 
-                              value={newClient.contactEmail} 
-                              onChange={(e) => setNewClient({...newClient, contactEmail: e.target.value})}
-                              className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold outline-none" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-white/60 mb-1">Contact Phone</label>
-                            <input 
-                              type="text" 
-                              value={newClient.contactPhone} 
-                              onChange={(e) => setNewClient({...newClient, contactPhone: e.target.value})}
-                              className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold outline-none" 
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-white/60 mb-1">Tier Plan</label>
-                            <select 
-                              value={newClient.plan} 
-                              onChange={(e) => setNewClient({...newClient, plan: e.target.value})}
-                              className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-gold outline-none"
-                            >
-                              <option value="STARTER">STARTER ($1,497/mo)</option>
-                              <option value="GROWTH">GROWTH ($2,997/mo)</option>
-                              <option value="DOMINANCE">DOMINANCE ($5,997/mo)</option>
-                            </select>
-                          </div>
-                          <div className="pt-2 flex justify-end gap-3">
-                            <button type="button" onClick={() => setShowAddClientModal(false)} className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/80 hover:bg-white/5">Cancel</button>
-                            <button type="submit" className="rounded-full bg-gold text-background px-5 py-2 text-xs font-semibold hover:brightness-95">Save Client</button>
-                          </div>
-                        </form>
-                      </div>
+                  <form onSubmit={handleCreateClient} className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] text-white/50 uppercase mb-1">Company Name</label>
+                      <input
+                        required
+                        type="text"
+                        value={newClient.companyName}
+                        onChange={(e) => setNewClient({ ...newClient, companyName: e.target.value })}
+                        className="w-full bg-[#060e26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-gold outline-none"
+                      />
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* 2. VIEW ANALYTICS */}
-              {activeModal === 'view-analytics' && (
-                <div className="space-y-6">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
-                      <span className="text-xs text-white/50 block">Conversion Rate</span>
-                      <span className="text-xl font-semibold mt-1 block">18.7%</span>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
-                      <span className="text-xs text-white/50 block">Response Uptime</span>
-                      <span className="text-xl font-semibold mt-1 block">99.9%</span>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
-                      <span className="text-xs text-white/50 block">Missed Call Leads Recovered</span>
-                      <span className="text-xl font-semibold mt-1 block">87.2%</span>
-                    </div>
-                  </div>
-
-                  {/* HTML Bar Chart representation */}
-                  <div className="rounded-2xl border border-white/10 bg-[#08122e] p-6">
-                    <h3 className="font-semibold text-white text-sm mb-4">Lead Velocity (Last 5 Days)</h3>
-                    <div className="space-y-4">
-                      {[
-                        { day: 'Monday', count: 18, pct: '60%' },
-                        { day: 'Tuesday', count: 24, pct: '80%' },
-                        { day: 'Wednesday', count: 30, pct: '100%' },
-                        { day: 'Thursday', count: 15, pct: '50%' },
-                        { day: 'Friday', count: 21, pct: '70%' },
-                      ].map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-4 text-xs">
-                          <span className="w-20 text-white/70">{item.day}</span>
-                          <div className="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
-                            <div className="bg-gold h-full rounded-full transition-all duration-500" style={{ width: item.pct }} />
-                          </div>
-                          <span className="w-8 text-right font-bold text-white">{item.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. REVIEW LEADS PANEL */}
-              {activeModal === 'review-leads' && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-white text-md">Review Leads Console</h3>
-                  <div className="overflow-x-auto rounded-2xl border border-white/5 bg-white/5">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-white/10 bg-white/5 text-white/60 font-medium">
-                          <th className="p-3">Name</th>
-                          <th className="p-3">Email</th>
-                          <th className="p-3">Business</th>
-                          <th className="p-3 text-center">Status</th>
-                          <th className="p-3 text-right">Delete</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {leads.map((lead) => (
-                          <tr key={lead.id} className="border-b border-white/5 hover:bg-white/5 transition">
-                            <td className="p-3 font-semibold text-white">{lead.name}</td>
-                            <td className="p-3 text-white/70">{lead.email}</td>
-                            <td className="p-3 text-white/50">{lead.business || 'N/A'}</td>
-                            <td className="p-3 text-center">
-                              <select
-                                value={lead.status}
-                                onChange={(e) => handleUpdateLeadStatus(lead.id, e.target.value)}
-                                className="bg-[#050b1d] border border-white/10 rounded px-2 py-0.5 text-xs text-white"
-                              >
-                                <option value="NEW">NEW</option>
-                                <option value="CONTACTED">CONTACTED</option>
-                                <option value="RECOVERED">RECOVERED</option>
-                              </select>
-                            </td>
-                            <td className="p-3 text-right">
-                              <button
-                                onClick={() => handleDeleteLead(lead.id)}
-                                className="rounded p-1 bg-red-900/10 text-red-400 border border-red-500/20 hover:bg-red-900/20"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* 4. APPROVE APPOINTMENTS */}
-              {activeModal === 'approve-appointments' && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-white text-md">Customer Booking Approvals</h3>
-                  <div className="overflow-x-auto rounded-2xl border border-white/5 bg-white/5">
-                    <table className="w-full text-left border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-white/10 bg-white/5 text-white/60 font-medium">
-                          <th className="p-3">Title</th>
-                          <th className="p-3">Scheduled Time</th>
-                          <th className="p-3">Duration</th>
-                          <th className="p-3">Notes</th>
-                          <th className="p-3 text-center">Status</th>
-                          <th className="p-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {appointments.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="p-8 text-center text-white/50">No appointment bookings found.</td>
-                          </tr>
-                        ) : (
-                          appointments.map((appt) => (
-                            <tr key={appt.id} className="border-b border-white/5 hover:bg-white/5 transition">
-                              <td className="p-3 font-semibold text-white">{appt.title}</td>
-                              <td className="p-3 text-white/70">
-                                {new Date(appt.scheduledAt).toLocaleString(undefined, {
-                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                })}
-                              </td>
-                              <td className="p-3 text-white/50">{appt.durationMin} mins</td>
-                              <td className="p-3 text-white/60 max-w-xs truncate" title={appt.notes}>{appt.notes || 'N/A'}</td>
-                              <td className="p-3 text-center">
-                                <span className={`inline-block rounded-full px-2 py-0.5 text-2xs font-bold border ${
-                                  appt.status === 'CONFIRMED' ? 'bg-green-950 text-green-400 border-green-500/20' :
-                                  appt.status === 'CANCELLED' ? 'bg-red-950 text-red-400 border-red-500/20' :
-                                  'bg-amber-950 text-amber-400 border-amber-500/20'
-                                }`}>
-                                  {appt.status}
-                                </span>
-                              </td>
-                              <td className="p-3 text-right">
-                                <div className="flex justify-end gap-1.5">
-                                  {appt.status !== 'CONFIRMED' && (
-                                    <button
-                                      onClick={() => handleConfirmAppointment(appt.id, 'CONFIRMED')}
-                                      className="rounded bg-green-950 text-green-400 border border-green-500/20 px-2 py-1 text-2xs hover:bg-green-900/30 transition"
-                                    >
-                                      Confirm
-                                    </button>
-                                  )}
-                                  {appt.status !== 'CANCELLED' && (
-                                    <button
-                                      onClick={() => handleConfirmAppointment(appt.id, 'CANCELLED')}
-                                      className="rounded bg-red-950 text-red-400 border border-red-500/20 px-2 py-1 text-2xs hover:bg-red-900/30 transition"
-                                    >
-                                      Cancel
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* 5. TRAIN CHATBOT */}
-              {activeModal === 'train-chatbot' && (
-                <div className="space-y-6">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <h4 className="font-semibold text-white text-sm mb-3">Add Custom Knowledge Base Q&A</h4>
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-2xs text-white/50 mb-1">User Inquiry Question</label>
+                        <label className="block text-[10px] text-white/50 uppercase mb-1">Contact Name</label>
                         <input
                           type="text"
-                          value={newQ}
-                          onChange={(e) => setNewQ(e.target.value)}
-                          placeholder="e.g. Do you support API connections?"
-                          className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-gold outline-none"
+                          value={newClient.contactName}
+                          onChange={(e) => setNewClient({ ...newClient, contactName: e.target.value })}
+                          className="w-full bg-[#060e26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-gold outline-none"
                         />
                       </div>
                       <div>
-                        <label className="block text-2xs text-white/50 mb-1">AI Agent Response Answer</label>
-                        <textarea
-                          rows={2}
-                          value={newA}
-                          onChange={(e) => setNewA(e.target.value)}
-                          placeholder="e.g. Yes, we integrate with GoHighLevel, HubSpot, Salesforce, and direct webhooks."
-                          className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-gold outline-none"
+                        <label className="block text-[10px] text-white/50 uppercase mb-1">Phone</label>
+                        <input
+                          type="text"
+                          value={newClient.contactPhone}
+                          onChange={(e) => setNewClient({ ...newClient, contactPhone: e.target.value })}
+                          className="w-full bg-[#060e26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-gold outline-none"
                         />
                       </div>
-                      <button
-                        onClick={async () => {
-                          if (!newQ || !newA) return;
-                          const updatedKB = [...kbEntries, { q: newQ, a: newA }];
-                          const token = localStorage.getItem('token') || '';
-                          try {
-                            const res = await fetch('/api/admin/configs', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                Authorization: `Bearer ${token}`
-                              },
-                              body: JSON.stringify({ kbEntries: updatedKB })
-                            });
-                            if (res.ok) {
-                              setKbEntries(updatedKB);
-                              setNewQ('');
-                              setNewA('');
-                            } else {
-                              alert('Failed to save chatbot training data.');
-                            }
-                          } catch (err) {
-                            alert('Network error saving chatbot training data.');
-                          }
-                        }}
-                        className="rounded-full bg-gold text-background px-4 py-2 text-xs font-semibold hover:brightness-95 transition"
-                      >
-                        Add to Knowledge Base
-                      </button>
                     </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-white text-sm">Active Training Directory</h4>
-                    <div className="space-y-2 max-h-[30vh] overflow-y-auto">
-                      {kbEntries.map((entry, idx) => (
-                        <div key={idx} className="rounded-xl border border-white/5 bg-white/5 p-3">
-                          <p className="text-xs font-bold text-gold">Q: {entry.q}</p>
-                          <p className="text-xs text-white/70 mt-1">A: {entry.a}</p>
-                        </div>
-                      ))}
+                    <div>
+                      <label className="block text-[10px] text-white/50 uppercase mb-1">Email</label>
+                      <input
+                        required
+                        type="email"
+                        value={newClient.contactEmail}
+                        onChange={(e) => setNewClient({ ...newClient, contactEmail: e.target.value })}
+                        className="w-full bg-[#060e26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-gold outline-none"
+                      />
                     </div>
-                  </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-white/50 uppercase mb-1">Industry</label>
+                        <select
+                          value={newClient.industry}
+                          onChange={(e) => setNewClient({ ...newClient, industry: e.target.value })}
+                          className="w-full bg-[#060e26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                        >
+                          <option value="Septic & Drain">Septic & Drain</option>
+                          <option value="Industrial Cleaning">Industrial Cleaning</option>
+                          <option value="Commercial Laundry">Commercial Laundry</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-white/50 uppercase mb-1">Revenue Bracket</label>
+                        <select
+                          value={newClient.revenueBracket}
+                          onChange={(e) => setNewClient({ ...newClient, revenueBracket: e.target.value })}
+                          className="w-full bg-[#060e26] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                        >
+                          <option value="$5M–$15M">$5M–$15M</option>
+                          <option value="$8M–$40M">$8M–$40M</option>
+                          <option value="$5M–$25M">$5M–$25M</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-3">
+                      <button type="button" onClick={() => setShowAddClient(false)} className="rounded-xl border border-white/10 px-4 py-2 text-xs hover:bg-white/5">Cancel</button>
+                      <button type="submit" className="rounded-xl bg-gold text-background px-5 py-2 text-xs font-bold hover:brightness-105">Save Client</button>
+                    </div>
+                  </form>
                 </div>
-              )}
+              </div>
+            )}
+          </div>
+        )}
 
-              {/* 6. ADJUST AI SCRIPTS */}
-              {activeModal === 'adjust-scripts' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs text-white/60 mb-2">Voice Call Initial Pitch & Response Script</label>
-                    <textarea
-                      rows={6}
-                      value={voiceScript}
-                      onChange={(e) => setVoiceScript(e.target.value)}
-                      className="w-full bg-[#050b1d] border border-white/10 rounded-lg px-3 py-2 text-xs text-white/80 focus:border-gold outline-none font-mono"
-                    />
-                  </div>
+        {/* TAB 2: AI VOICE BUILDER */}
+        {activeTab === 'voice' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-white">AI Voice Builder & Scripts</h2>
+                <p className="text-xs text-white/50">Configure industry call prompts, logic trees, and call routing.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-[250px_1fr]">
+              {/* Industry Select list */}
+              <div className="space-y-2">
+                {[
+                  { id: 'septic', label: 'Septic & Drain Script' },
+                  { id: 'industrial', label: 'Industrial Cleaning' },
+                  { id: 'laundry', label: 'Commercial Laundry' }
+                ].map((s) => (
                   <button
-                    onClick={async () => {
-                      const token = localStorage.getItem('token') || '';
-                      try {
-                        const res = await fetch('/api/admin/configs', {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${token}`
-                          },
-                          body: JSON.stringify({ voiceScript })
-                        });
-                        if (res.ok) {
-                          alert('AI Voice Script prompt template updated successfully.');
-                          closeAction();
-                        } else {
-                          alert('Failed to update voice script.');
-                        }
-                      } catch (err) {
-                        alert('Network error updating voice script.');
+                    key={s.id}
+                    onClick={() => {
+                      setSelectedVoiceIndustry(s.id);
+                      if (s.id === 'septic') {
+                        setCallScript(`[Niche: Septic & Drain Callback Script]
+- Trigger: Outbound dial within 10 seconds of a missed call.
+- Introduction: "Hey there! This is the callback assistant for Septic Specialists. We saw we just missed a call from this number a few seconds ago and wanted to get right back to you. Did we catch you at a good time?"`);
+                      } else if (s.id === 'industrial') {
+                        setCallScript(`[Niche: Industrial Cleaning Reactivation Script]
+- Trigger: Outbound re-engagement list dial.
+- Introduction: "Hello, this is Industrial Jetting Corp. We are following up on our tank maintenance cleanout contract options from last fall. Are you the lead dispatcher?"`);
+                      } else {
+                        setCallScript(`[Niche: Commercial Laundry Script]
+- Trigger: Inbound route answering service.
+- Introduction: "Hello and thank you for calling Laundry Route Solutions. Let's look up your commercial account ID. Are you calling regarding hospitality pick-up logistics?"`);
                       }
                     }}
-                    className="rounded-full bg-gold text-background px-5 py-2.5 text-xs font-semibold hover:brightness-95 transition"
+                    className={`w-full rounded-xl px-4 py-3 text-left text-xs font-semibold transition ${
+                      selectedVoiceIndustry === s.id
+                        ? 'bg-gold/10 border border-gold text-gold'
+                        : 'bg-white/5 border border-transparent text-white/70 hover:bg-white/10'
+                    }`}
                   >
-                    Save Voice Scripts
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Edit script pane */}
+              <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 space-y-4">
+                <div>
+                  <label className="block text-xs text-white/60 mb-2 font-semibold uppercase tracking-wider">System Prompt Script Editor</label>
+                  <textarea
+                    value={callScript}
+                    onChange={(e) => setCallScript(e.target.value)}
+                    className="w-full bg-[#050b1d] border border-white/10 rounded-xl p-4 font-mono text-xs text-white outline-none focus:border-gold h-72"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="flex gap-2 items-center">
+                    <span className="text-[10px] text-white/50">Forwarding Target:</span>
+                    <input
+                      type="text"
+                      defaultValue="+1 (555) 0188"
+                      className="bg-[#050b1d] border border-white/10 rounded px-2 py-0.5 text-[10px] text-white outline-none w-28"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleSaveScript}
+                    className="rounded-xl bg-gold text-background px-6 py-2.5 text-xs font-bold hover:brightness-105 transition"
+                  >
+                    Save Voice Configuration
                   </button>
                 </div>
-              )}
 
+                {scriptSaved && (
+                  <p className="text-xs text-emerald-400 font-semibold text-center animate-pulse">
+                    ✅ Voice script synced across active instances and loaded successfully.
+                  </p>
+                )}
+              </div>
             </div>
-
-            {/* Modal Footer */}
-            <div className="flex justify-end border-t border-white/10 pt-4 mt-6">
-              <button 
-                onClick={closeAction}
-                className="rounded-full bg-white/5 border border-white/10 px-6 py-2.5 text-xs text-white/80 hover:bg-white/10 transition"
-              >
-                Close Panel
-              </button>
-            </div>
-
           </div>
-        </div>
-      )}
+        )}
 
+        {/* TAB 3: MISSED CALL ENGINE */}
+        {activeTab === 'engine' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white">Missed Call Engine</h2>
+              <p className="text-xs text-white/50">Live feed of missed calls. See AI trigger outbound dials instantly, listen-in, or take over.</p>
+            </div>
+
+            <div className="space-y-3">
+              {liveMissedCalls.map((call) => (
+                <div key={call.id} className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-gold/10 text-gold flex items-center justify-center">
+                      <PhoneCall className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">{call.name} ({call.phone})</p>
+                      <p className="text-[10px] text-white/40 mt-0.5">Status: <strong className="text-gold">{call.status}</strong></p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    {call.active ? (
+                      <>
+                        <button
+                          onClick={() => setAgentListeningId(agentListeningId === call.id ? null : call.id)}
+                          className={`rounded-xl px-4 py-2 text-xs font-bold border transition ${
+                            agentListeningId === call.id
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-500/25'
+                              : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
+                          }`}
+                        >
+                          {agentListeningId === call.id ? '🔇 Mute Feed' : '🎧 Listen In'}
+                        </button>
+
+                        <button
+                          onClick={() => setTakeOverActiveId(takeOverActiveId === call.id ? null : call.id)}
+                          className={`rounded-xl px-4 py-2 text-xs font-bold border transition ${
+                            takeOverActiveId === call.id
+                              ? 'bg-red-950 text-red-300 border-red-500/25'
+                              : 'bg-gold text-background border-gold hover:brightness-105'
+                          }`}
+                        >
+                          {takeOverActiveId === call.id ? '🤝 AI Re-enabled' : '🎙️ Take Over Call'}
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-white/30 self-center">Session Inactive</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {agentListeningId && (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/20 p-4 flex items-center gap-3 text-xs text-emerald-400">
+                <PlayCircle className="h-5 w-5 animate-pulse text-emerald-400" />
+                <span>🎧 Live audio stream matched. Listening to conversation outcome: &quot;AI is prompting scheduling time choices...&quot;</span>
+              </div>
+            )}
+
+            {takeOverActiveId && (
+              <div className="rounded-2xl border border-red-500/20 bg-red-950/20 p-4 flex items-center gap-3 text-xs text-red-400 animate-pulse">
+                <AlertTriangle className="h-5 w-5 text-red-400" />
+                <span>⚠️ AI script deactivated. Microphone routing active: Agent holds live call.</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: REACTIVATION LAUNCHER */}
+        {activeTab === 'reactivation' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white">Reactivation Launcher</h2>
+              <p className="text-xs text-white/50">Upload dead lead CSV database lists, select industry campaigns, and trigger outreach.</p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 space-y-4">
+                <h3 className="text-sm font-bold text-white">Launch Reactivation Campaign</h3>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[10px] text-white/50 uppercase mb-1">1. Choose Template Tone</label>
+                    <select
+                      value={selectedCampaignTemplate}
+                      onChange={(e) => setSelectedCampaignTemplate(e.target.value)}
+                      className="w-full bg-[#050b1d] border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                    >
+                      <option value="septic-stale">Septic Stale Contract Renewal (Tone: Helpful)</option>
+                      <option value="cleaning-cold">Industrial Cold Outbound Blaster (Tone: Professional)</option>
+                      <option value="hospitality-text">Commercial Laundry Account Revival (Tone: Direct)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-white/50 uppercase mb-1">2. Upload Dead Lead List (.csv)</label>
+                    <div className="relative border border-dashed border-white/20 rounded-xl bg-white/5 p-6 text-center hover:bg-white/10 transition cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleCsvUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <Upload className="mx-auto h-8 w-8 text-white/40 mb-2" />
+                      <p className="text-xs text-white/80">Click or Drag CSV here</p>
+                      <p className="text-[10px] text-white/40 mt-1">Columns required: Name, Phone, Email, Business</p>
+                    </div>
+                  </div>
+
+                  {csvUploadStatus && (
+                    <div className="rounded-xl bg-white/5 border border-white/5 p-3 text-[10px] text-gold font-semibold text-center animate-pulse">
+                      {csvUploadStatus}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleLaunchCampaign}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-gold py-3 text-xs font-bold text-background transition hover:brightness-105"
+                  >
+                    Launch Outreach Sequence
+                  </button>
+                </div>
+              </div>
+
+              {/* Logs */}
+              <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 space-y-4">
+                <h3 className="text-sm font-bold text-white">Reactivation History Logs</h3>
+                <div className="space-y-3">
+                  {reactivationLogs.map((log) => (
+                    <div key={log.id} className="rounded-xl bg-white/5 border border-white/5 p-4 flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-white">{log.campaign}</span>
+                        <span className="text-[10px] text-white/40">{log.date}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-white/70 bg-[#04081c] p-2 rounded-lg">
+                        <div>
+                          <span>Contacted:</span>
+                          <span className="block font-bold text-white mt-0.5">{log.contacted}</span>
+                        </div>
+                        <div>
+                          <span>Replies:</span>
+                          <span className="block font-bold text-white mt-0.5">{log.replies}</span>
+                        </div>
+                        <div>
+                          <span>Booked:</span>
+                          <span className="block font-bold text-gold mt-0.5">{log.bookings}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: CRM INTEGRATIONS */}
+        {activeTab === 'crm' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white">CRM Integrations & Sync</h2>
+              <p className="text-xs text-white/50">Connect clients tools to automate scheduling, dispatch dispatching, and logs directly.</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { name: 'ServiceTitan', id: 'servicetitan', desc: 'Sync septic bookings, tech dispatching status, and customer notes directly.', key: 'servicetitan' },
+                { name: 'HubSpot CRM', id: 'hubspot', desc: 'Sync inbound leads pipeline and lead reactivation stages automatically.', key: 'hubspot' },
+                { name: 'Salesforce Enterprise', id: 'salesforce', desc: 'Sync custom fields, revenue outcomes, and call library logs.', key: 'salesforce' }
+              ].map((crm) => (
+                <div key={crm.id} className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 flex flex-col justify-between gap-4">
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-white">{crm.name}</h3>
+                      <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[9px] text-emerald-400 font-bold">
+                        Connected
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-white/50 mt-2 leading-relaxed">{crm.desc}</p>
+                  </div>
+
+                  <button
+                    onClick={() => alert(`${crm.name} integration details loaded for clients.`)}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white py-2 text-2xs font-semibold transition"
+                  >
+                    Configure Sync Fields
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: INTERNAL INBOX */}
+        {activeTab === 'inbox' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white">Internal Inbox</h2>
+              <p className="text-xs text-white/50">Lead replies route here. Read messages and schedule manually if necessary.</p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-[300px_1fr]">
+              {/* Message index list */}
+              <div className="space-y-2">
+                {inboxMessages.map((msg) => (
+                  <button
+                    key={msg.id}
+                    onClick={() => setSelectedInboxId(msg.id)}
+                    className={`w-full rounded-xl p-3 text-left border transition flex flex-col gap-1 ${
+                      selectedInboxId === msg.id
+                        ? 'bg-gold/10 border-gold text-white'
+                        : 'bg-white/5 border-transparent text-white/70 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center w-full">
+                      <span className="text-xs font-bold text-white truncate">{msg.clientName}</span>
+                      <span className="text-[9px] text-white/40">{msg.date}</span>
+                    </div>
+                    <p className="text-[10px] text-white/50 truncate w-full">{msg.message}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat View */}
+              {selectedInboxId ? (
+                <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 flex flex-col justify-between min-h-[350px]">
+                  <div>
+                    <div className="border-b border-white/5 pb-3 mb-4">
+                      <h4 className="text-xs font-bold text-white">
+                        Conversation with {inboxMessages.find(m => m.id === selectedInboxId)?.clientName}
+                      </h4>
+                      <p className="text-[9px] text-white/40 mt-0.5">Phone: {inboxMessages.find(m => m.id === selectedInboxId)?.phone} • SMS Channel</p>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="rounded-xl bg-white/5 p-3 text-xs text-white max-w-[80%]">
+                        <span className="text-[9px] font-bold text-gold uppercase block mb-1">Incoming Lead Text</span>
+                        <p>{inboxMessages.find(m => m.id === selectedInboxId)?.message}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleInboxReply} className="flex gap-2 pt-3 border-t border-white/5 mt-4">
+                    <input
+                      required
+                      type="text"
+                      value={inboxReplyText}
+                      onChange={(e) => setInboxReplyText(e.target.value)}
+                      placeholder="Type message to route manually..."
+                      className="flex-1 bg-[#050b1d] border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white focus:border-gold outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-gold text-background px-4 py-3 text-xs font-bold hover:brightness-105"
+                    >
+                      Send Reply
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-10 text-center text-white/40">
+                  Select a message from the sidebar to inspect conversation transcript.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
     </main>
   );
 }

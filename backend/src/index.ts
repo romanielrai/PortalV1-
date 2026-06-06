@@ -13,6 +13,7 @@ const leadRoutes = require('./routes/leads').default;
 const dashboardRoutes = require('./routes/dashboard').default;
 const chatbotRoutes = require('./routes/chatbot').default;
 const voiceRoutes = require('./routes/voice').default;
+const trialRoutes = require('./routes/trial').default;
 const superadminRoutes = require('./routes/superadmin').default;
 const adminRoutes = require('./routes/admin').default;
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/leads', leadRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/voice', voiceRoutes);
+app.use('/api/voice', trialRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/admin', adminRoutes);
 

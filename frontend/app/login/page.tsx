@@ -1,24 +1,24 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Lock, User, Phone, Briefcase, ArrowRight, Bot } from 'lucide-react';
+import { Mail, Lock, Phone, ArrowRight, Bot, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [loginTab, setLoginTab] = useState<'client' | 'agent'>('client');
   const [status, setStatus] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Form Fields
+  // Magic Link Fields
+  const [clientPhone, setClientPhone] = useState('');
+  const [magicLinkLabel, setMagicLinkLabel] = useState('');
+
+  // Agent Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [businessName, setBusinessName] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -29,107 +29,78 @@ export default function LoginPage() {
         const role = user.role?.toUpperCase();
         if (role === 'SUPERADMIN') router.push('/superadmin');
         else if (role === 'ADMIN') router.push('/admin');
-        else if (role === 'USER') router.push('/dashboard/user');
         else router.push('/dashboard');
       } catch (e) {
         router.push('/dashboard');
       }
-    } else if (token) {
-      router.push('/dashboard');
     }
   }, [router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle Client SMS Magic Link Request
+  const handleRequestMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientPhone) return;
+    setLoading(true);
+    setErrorMsg('');
+    setStatus('Generating Magic Link...');
+
+    setTimeout(() => {
+      setLoading(false);
+      setStatus('SMS Magic Link generated successfully! (Demo Mode)');
+      setMagicLinkLabel('👉 Click here to login as Client instantly');
+    }, 1200);
+  };
+
+  // Handle Magic Link Login Redirect
+  const handleMagicLinkLogin = () => {
+    // Write demo client auth state
+    localStorage.setItem('token', 'mock-magic-client-token-' + Math.random().toString(36).substring(7));
+    localStorage.setItem('user', JSON.stringify({
+      id: 'client-default-user',
+      name: 'Septic & Drain Operators',
+      email: 'operations@septic-drain.com',
+      role: 'CLIENT',
+      clientId: 'client-default'
+    }));
+    router.push('/dashboard');
+  };
+
+  // Handle Agent Email/Password login
+  const handleAgentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setStatus('');
     setErrorMsg('');
 
     try {
-      if (isSignUp) {
-        // Sign Up Flow
-        setStatus('Creating account...');
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            password,
-            name,
-            phoneNumber,
-            businessName,
-            roleName: 'CLIENT'
-          })
-        });
+      setStatus('Signing in to Agent Cockpit...');
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
 
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || 'Registration failed');
-        }
-
-        // Auto-login after successful registration
-        setStatus('Account created! Logging you in...');
-        const loginRes = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        
-        const loginData = await loginRes.json();
-        if (!loginRes.ok) {
-          throw new Error('Registration succeeded, but auto-login failed. Please sign in manually.');
-        }
-
-        if (loginData.token) localStorage.setItem('token', loginData.token);
-        if (loginData.user) localStorage.setItem('user', JSON.stringify(loginData.user));
-
-        setStatus('Registration successful! Redirecting...');
-        const role = loginData.user?.role?.toUpperCase();
-        setTimeout(() => {
-          if (role === 'SUPERADMIN') router.push('/superadmin');
-          else if (role === 'ADMIN') router.push('/admin');
-          else if (role === 'USER') router.push('/dashboard/user');
-          else router.push('/dashboard');
-        }, 800);
-
-      } else {
-        // Sign In Flow
-        setStatus('Signing in...');
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || 'Invalid email or password');
-        }
-
-        if (data.token) localStorage.setItem('token', data.token);
-        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
-
-        setStatus('Sign in successful! Redirecting...');
-        const role = data.user?.role?.toUpperCase();
-        setTimeout(() => {
-          if (role === 'SUPERADMIN') router.push('/superadmin');
-          else if (role === 'ADMIN') router.push('/admin');
-          else if (role === 'USER') router.push('/dashboard/user');
-          else router.push('/dashboard');
-        }, 800);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid email or password');
       }
+
+      if (data.token) localStorage.setItem('token', data.token);
+      if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+
+      setStatus('Access Granted! Redirecting...');
+      const role = data.user?.role?.toUpperCase();
+      setTimeout(() => {
+        if (role === 'SUPERADMIN') router.push('/superadmin');
+        else if (role === 'ADMIN') router.push('/admin');
+        else router.push('/dashboard');
+      }, 800);
     } catch (err: any) {
-      setErrorMsg(err.message || 'An unexpected error occurred.');
+      setErrorMsg(err.message || 'An unexpected connection error occurred.');
       setStatus('');
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp);
-    setErrorMsg('');
-    setStatus('');
   };
 
   return (
@@ -143,21 +114,57 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="w-full max-w-[460px] rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl text-slate-900"
+        className="w-full max-w-[460px] rounded-[32px] border border-white/10 bg-glass p-8 shadow-glow text-white"
       >
         {/* Header Icon / Logo */}
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gold/10 text-gold shadow-sm">
           <Bot size={28} className="animate-pulse" />
         </div>
 
-        {/* Dynamic Titles */}
-        <div className="mt-6 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            {isSignUp ? 'Create Account' : 'Welcome Back'}
+        {/* Title */}
+        <div className="mt-5 text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            AI Growth Systems
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            {isSignUp ? 'Join AI Growth Systems today' : 'Sign in to your AI Growth Systems account'}
+          <p className="mt-1.5 text-xs text-white/50">
+            Secure portal access for clients and agents
           </p>
+        </div>
+
+        {/* Tab Selection */}
+        <div className="mt-6 flex rounded-xl bg-white/5 p-1 border border-white/5">
+          <button
+            type="button"
+            onClick={() => {
+              setLoginTab('client');
+              setStatus('');
+              setErrorMsg('');
+              setMagicLinkLabel('');
+            }}
+            className={`flex-1 rounded-lg py-2.5 text-xs font-semibold tracking-wide transition ${
+              loginTab === 'client' 
+                ? 'bg-gold text-background shadow-md' 
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Client Command Center
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLoginTab('agent');
+              setStatus('');
+              setErrorMsg('');
+              setMagicLinkLabel('');
+            }}
+            className={`flex-1 rounded-lg py-2.5 text-xs font-semibold tracking-wide transition ${
+              loginTab === 'agent' 
+                ? 'bg-gold text-background shadow-md' 
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Agent Dashboard
+          </button>
         </div>
 
         {/* Status / Error Alerts */}
@@ -167,7 +174,7 @@ export default function LoginPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700 font-medium"
+              className="mt-5 rounded-xl border border-red-500/20 bg-red-950/20 p-4 text-xs text-red-300 font-medium"
             >
               {errorMsg}
             </motion.div>
@@ -177,156 +184,112 @@ export default function LoginPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-5 rounded-2xl border border-gold/20 bg-gold/5 p-4 text-xs text-gold font-semibold"
+              className="mt-5 rounded-xl border border-gold/20 bg-gold/5 p-4 text-xs text-gold font-semibold"
             >
               {status}
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Registration / Login Form */}
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          {isSignUp && (
-            <>
-              {/* Full Name */}
-              <div>
-                <label className="text-xxs font-bold text-slate-400 tracking-wider uppercase">Full Name</label>
-                <div className="relative mt-1.5 rounded-2xl bg-[#f8fafc] border border-slate-100 focus-within:border-gold/50 transition">
-                  <span className="absolute inset-y-0 left-4 flex items-center text-slate-400">
-                    <User size={16} />
-                  </span>
-                  <input
-                    required
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="John Doe"
-                    className="w-full rounded-2xl bg-transparent py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  />
+        {/* CLIENT SMS MAGIC LINK LOGIN FORM */}
+        {loginTab === 'client' && (
+          <div className="mt-6 space-y-4">
+            {magicLinkLabel ? (
+              <button
+                type="button"
+                onClick={handleMagicLinkLogin}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 py-4 text-xs font-bold text-emerald-300 transition-all duration-300 hover:scale-[1.01]"
+              >
+                <Sparkles className="h-4 w-4 text-emerald-400" />
+                {magicLinkLabel}
+              </button>
+            ) : (
+              <form onSubmit={handleRequestMagicLink} className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-white/50 tracking-wider uppercase">SMS Phone Number</label>
+                  <div className="relative mt-2 rounded-xl bg-white/5 border border-white/10 focus-within:border-gold/50 transition">
+                    <span className="absolute inset-y-0 left-4 flex items-center text-white/40">
+                      <Phone size={16} />
+                    </span>
+                    <input
+                      required
+                      type="tel"
+                      value={clientPhone}
+                      onChange={(e) => setClientPhone(e.target.value)}
+                      placeholder="+1 (555) 000-0000"
+                      className="w-full bg-transparent py-3.5 pl-11 pr-4 text-xs text-white outline-none"
+                    />
+                  </div>
+                  <p className="mt-2 text-[10px] text-white/40 leading-relaxed">
+                    No password required. Enter your number to receive a temporary magic link to your portal.
+                  </p>
                 </div>
-              </div>
 
-              {/* Phone Number */}
-              <div>
-                <label className="text-xxs font-bold text-slate-400 tracking-wider uppercase">Phone Number</label>
-                <div className="relative mt-1.5 rounded-2xl bg-[#f8fafc] border border-slate-100 focus-within:border-gold/50 transition">
-                  <span className="absolute inset-y-0 left-4 flex items-center text-slate-400">
-                    <Phone size={16} />
-                  </span>
-                  <input
-                    required
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="+1 (555) 000-0000"
-                    className="w-full rounded-2xl bg-transparent py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-
-              {/* Business Name */}
-              <div>
-                <label className="text-xxs font-bold text-slate-400 tracking-wider uppercase">Business Name</label>
-                <div className="relative mt-1.5 rounded-2xl bg-[#f8fafc] border border-slate-100 focus-within:border-gold/50 transition">
-                  <span className="absolute inset-y-0 left-4 flex items-center text-slate-400">
-                    <Briefcase size={16} />
-                  </span>
-                  <input
-                    required
-                    type="text"
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                    placeholder="Acme Corporation"
-                    className="w-full rounded-2xl bg-transparent py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Email Address */}
-          <div>
-            <label className="text-xxs font-bold text-slate-400 tracking-wider uppercase">Email Address</label>
-            <div className="relative mt-1.5 rounded-2xl bg-[#f8fafc] border border-slate-100 focus-within:border-gold/50 transition">
-              <span className="absolute inset-y-0 left-4 flex items-center text-slate-400">
-                <Mail size={16} />
-              </span>
-              <input
-                required
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full rounded-2xl bg-transparent py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <div className="flex justify-between items-center">
-              <label className="text-xxs font-bold text-slate-400 tracking-wider uppercase">Password</label>
-              {!isSignUp && (
-                <Link
-                  href="/contact"
-                  className="text-xs font-semibold text-gold hover:brightness-95 transition"
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gold py-3.5 text-xs font-semibold text-background transition hover:brightness-105"
                 >
-                  Forgot Password?
-                </Link>
-              )}
-            </div>
-            <div className="relative mt-1.5 rounded-2xl bg-[#f8fafc] border border-slate-100 focus-within:border-gold/50 transition">
-              <span className="absolute inset-y-0 left-4 flex items-center text-slate-400">
-                <Lock size={16} />
-              </span>
-              <input
-                required
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="w-full rounded-2xl bg-transparent py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
-            </div>
+                  <span>Request SMS Magic Link</span>
+                  <ArrowRight size={14} />
+                </button>
+              </form>
+            )}
           </div>
+        )}
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gold py-4 text-sm font-semibold text-background transition-all duration-300 hover:brightness-105 hover:shadow-[0_4px_20px_rgba(207,199,186,0.35)] disabled:opacity-50"
-          >
-            <span>{isSignUp ? 'Sign Up' : 'Sign In'}</span>
-            <ArrowRight size={16} />
-          </button>
-        </form>
+        {/* AGENT PASSWORD LOGIN FORM */}
+        {loginTab === 'agent' && (
+          <form onSubmit={handleAgentSubmit} className="mt-6 space-y-4">
+            <div>
+              <label className="text-[10px] font-bold text-white/50 tracking-wider uppercase">Agent Email</label>
+              <div className="relative mt-2 rounded-xl bg-white/5 border border-white/10 focus-within:border-gold/50 transition">
+                <span className="absolute inset-y-0 left-4 flex items-center text-white/40">
+                  <Mail size={16} />
+                </span>
+                <input
+                  required
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="agent@aigrowthsystems.com"
+                  className="w-full bg-transparent py-3.5 pl-11 pr-4 text-xs text-white outline-none"
+                />
+              </div>
+            </div>
 
-        {/* Footer Mode Switcher */}
-        <div className="mt-8 text-center text-sm text-slate-500 border-t border-slate-100 pt-5">
-          {isSignUp ? (
-            <p>
-              Already have an account?{' '}
-              <button
-                type="button"
-                onClick={toggleMode}
-                className="font-semibold text-gold hover:underline"
-              >
-                Sign In
-              </button>
-            </p>
-          ) : (
-            <p>
-              Don&apos;t have an account?{' '}
-              <button
-                type="button"
-                onClick={toggleMode}
-                className="font-semibold text-gold hover:underline"
-              >
-                Sign Up / Register
-              </button>
-            </p>
-          )}
-        </div>
+            <div>
+              <label className="text-[10px] font-bold text-white/50 tracking-wider uppercase">Password</label>
+              <div className="relative mt-2 rounded-xl bg-white/5 border border-white/10 focus-within:border-gold/50 transition">
+                <span className="absolute inset-y-0 left-4 flex items-center text-white/40">
+                  <Lock size={16} />
+                </span>
+                <input
+                  required
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-transparent py-3.5 pl-11 pr-4 text-xs text-white outline-none"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gold py-3.5 text-xs font-semibold text-background transition hover:brightness-105"
+            >
+              <span>Verify Credentials</span>
+              <ArrowRight size={14} />
+            </button>
+
+            <div className="mt-4 rounded-xl bg-white/5 border border-white/5 p-3 text-[10px] text-white/50 leading-relaxed">
+              <span className="font-bold text-gold uppercase block mb-1">Demo Credentials:</span>
+              <span>Email: <strong className="text-white">superadmin@gmail.com</strong><br />Password: <strong className="text-white">AdminPass123!</strong></span>
+            </div>
+          </form>
+        )}
       </motion.div>
     </main>
   );

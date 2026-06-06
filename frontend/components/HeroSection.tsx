@@ -218,6 +218,27 @@ export default function HeroSection() {
             </div>
           </div>
         </motion.div>
+
+      </div>
+
+      {/* ── Trust / Partner Badges ── */}
+      <div className="mt-10 pt-8 border-t border-white/5 flex flex-wrap items-center justify-center lg:justify-between gap-6 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
+          <span>ServiceTitan Integration Ready</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
+          <span>Always-On 24/7 AI Answering</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
+          <span>Outbound Reactivation Campaigns</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
+          <span>Enterprise Secure & GDPR Ready</span>
+        </div>
       </div>
     </section>
   );

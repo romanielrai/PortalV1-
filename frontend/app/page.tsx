@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import HeroSection from '@/components/HeroSection';
-import ServiceGrid from '@/components/ServiceGrid';
+import ValuePillars from '@/components/ValuePillars';
+import IndustriesSection from '@/components/IndustriesSection';
 import AssistantPanel from '@/components/AssistantPanel';
+import RoiCalculator from '@/components/RoiCalculator';
 import PricingSection from '@/components/PricingSection';
 import ContactSection from '@/components/ContactSection';
 import CTASection from '@/components/CTASection';
@@ -29,7 +31,17 @@ export default function HomePage() {
         transition={{ duration: 0.8 }}
         className="mx-auto mt-20 max-w-7xl"
       >
-        <ServiceGrid />
+        <ValuePillars />
+      </motion.section>
+
+      <motion.section
+        initial={mounted ? { opacity: 0, y: 40 } : false}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8 }}
+        className="mx-auto mt-20 max-w-7xl"
+      >
+        <IndustriesSection />
       </motion.section>
 
       <motion.section
@@ -40,6 +52,16 @@ export default function HomePage() {
         className="mx-auto mt-24 max-w-7xl"
       >
         <AssistantPanel />
+      </motion.section>
+
+      <motion.section
+        initial={mounted ? { opacity: 0, y: 40 } : false}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.8, delay: 0.15 }}
+        className="mx-auto mt-24 max-w-7xl"
+      >
+        <RoiCalculator />
       </motion.section>
 
       <motion.section
