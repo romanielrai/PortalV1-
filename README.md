@@ -16,7 +16,7 @@ Enterprise AI automation platform for AI receptionists, missed call recovery, le
 
 **Anywhere:** `npm run dev`
 
-Then open: **http://localhost:3001**
+Then open: **http://localhost:5504**
 
 ✅ Done! You're live.
 
@@ -67,7 +67,7 @@ Then open: **http://localhost:3001**
 
 | Service | URL |
 |---------|-----|
-| Frontend | http://localhost:3001 |
+| Frontend | http://localhost:5504 |
 | Backend | http://localhost:4000 |
 | API Health | http://localhost:4000/api/health |
 
