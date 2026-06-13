@@ -350,8 +350,10 @@ export default function AgentDashboard() {
               <span className="h-2.5 w-2.5 rounded-full bg-gold border border-gold/40" />
               <p className="text-xs uppercase tracking-[0.3em] text-gold font-bold">Agent Dashboard: {user?.name || 'Agent'}</p>
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">Welcome Back, {user?.name || 'Systems Admin'}</h1>
-            <p className="text-xs text-white/50 mt-1">Role / Profile: {user?.role || 'ADMIN'} Interface ({user?.email})</p>
+            <h1 className="mt-2 text-2xl font-extrabold md:text-3xl bg-gradient-to-r from-white via-white to-gold bg-clip-text text-transparent">
+              Welcome Back, {user?.name || 'Systems Admin'}
+            </h1>
+            {/* Role / Profile subtext hidden by user request */}
           </div>
           
           <div className="flex items-center gap-3 flex-wrap">

@@ -287,8 +287,10 @@ export default function CommandCenterPage() {
               <span className="h-2 w-2 rounded-full bg-gold animate-ping" />
               <p className="text-xs uppercase tracking-[0.3em] text-gold font-bold">Logged In User</p>
             </div>
-            <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">{user?.name || 'Welcome Back'}</h1>
-            <p className="text-xs text-white/50 mt-1">Role / Profile: {user?.role || 'CLIENT'} Workspace ({user?.email})</p>
+            <h1 className="mt-2 text-2xl font-extrabold md:text-3xl bg-gradient-to-r from-white via-white to-gold bg-clip-text text-transparent">
+              {user?.name || 'Welcome Back'}
+            </h1>
+            {/* Role / Profile subtext hidden by user request */}
           </div>
           
           <div className="flex items-center gap-3 flex-wrap">
