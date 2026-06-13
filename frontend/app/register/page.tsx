@@ -150,14 +150,14 @@ export default function RegisterPage() {
 
           {/* Progress Steps Bar - 2 steps */}
           <div className="mt-8 relative flex items-center justify-between px-16">
-            {/* Background line */}
-            <div className="absolute left-16 right-16 top-1/2 h-[2px] -translate-y-1/2 bg-white/10 z-0" />
-            
-            {/* Active line */}
-            <div 
-              className="absolute left-16 top-1/2 h-[2px] -translate-y-1/2 bg-red-600 transition-all duration-300 z-0" 
-              style={{ width: step === 2 ? '100%' : '0%' }}
-            />
+            {/* Progress line container */}
+            <div className="absolute left-16 right-16 top-1/2 h-[2px] -translate-y-1/2 bg-white/10 z-0 overflow-hidden">
+              {/* Active line */}
+              <div 
+                className="h-full bg-red-600 transition-all duration-300" 
+                style={{ width: step === 2 ? '100%' : '0%' }}
+              />
+            </div>
 
             {/* Step 1 Circle */}
             <div className="relative z-10 flex flex-col items-center">
