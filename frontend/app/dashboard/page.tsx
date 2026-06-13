@@ -501,19 +501,20 @@ export default function CommandCenterPage() {
           </div>
 
           {/* SMS logs with leads */}
-          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 flex flex-col justify-between min-h-[380px]">
-            <div>
-              <div className="flex justify-between items-center border-b border-white/5 pb-3 mb-4">
-                <h3 className="text-md font-bold text-white flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-gold" /> SMS Conversational Logs
-                </h3>
-                <span className="rounded-full bg-gold/10 px-2.5 py-0.5 text-[9px] font-semibold text-gold border border-gold/20">
-                  Lead: John Connor (Septic)
-                </span>
-              </div>
+          <div className="rounded-2xl border border-white/10 bg-[#060e26]/60 p-5 md:p-6 flex flex-col h-[400px]">
+            {/* Card Header */}
+            <div className="flex justify-between items-center border-b border-white/5 pb-3 mb-4 flex-shrink-0">
+              <h3 className="text-md font-bold text-white flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-gold" /> SMS Conversational Logs
+              </h3>
+              <span className="rounded-full bg-gold/10 px-2.5 py-0.5 text-[9px] font-semibold text-gold border border-gold/20">
+                Lead: John Connor (Septic)
+              </span>
+            </div>
 
-              {/* Chat timeline */}
-              <div className="space-y-3 max-h-[240px] overflow-y-auto pr-1">
+            {/* Chat timeline - fills remaining height, scrolls if overflow, aligns chats to the bottom */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col justify-end">
+              <div className="space-y-3">
                 {smsLogs.map((msg, idx) => (
                   <div
                     key={idx}
@@ -534,7 +535,7 @@ export default function CommandCenterPage() {
             </div>
 
             {/* Read-Only Mock input to test conversation flow */}
-            <form onSubmit={handleSendSMS} className="mt-4 flex gap-2 pt-3 border-t border-white/5">
+            <form onSubmit={handleSendSMS} className="mt-4 flex gap-2 pt-3 border-t border-white/5 flex-shrink-0">
               <input
                 type="text"
                 value={replyText}
