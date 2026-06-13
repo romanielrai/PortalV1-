@@ -25,3 +25,5 @@ openai-4.13.0.tgz
 temp-openai/
 *.tsbuildinfo
 
+# Local JSON database storage
+backend/prisma/db.json

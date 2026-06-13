@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   PhoneIncoming, Users, TrendingUp, PhoneCall, RefreshCw, 
   Play, Pause, Send, PhoneOutgoing, LogOut, Smartphone, MessageSquare, 
-  Volume2, Sparkles
+  Volume2, Sparkles, ShieldAlert
 } from 'lucide-react';
 
 interface CallRecord {
@@ -278,17 +278,6 @@ export default function CommandCenterPage() {
 
   return (
     <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 md:px-12">
-      {user?.role === 'SUPERADMIN' && (
-        <div className="bg-purple-900/30 border border-purple-500/30 text-purple-200 px-5 py-4 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold backdrop-blur-md mb-6">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-            <span>Logged in as <strong className="text-purple-300">SUPERADMIN</strong>. You are accessing the **Client Command Center Simulator** view.</span>
-          </div>
-          <Link href="/superadmin" className="rounded-full bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 text-xs transition duration-200">
-            Back to Superadmin Cockpit
-          </Link>
-        </div>
-      )}
       <div className="rounded-[32px] border border-white/10 bg-glass p-6 md:p-10 shadow-glow space-y-8">
         
         {/* Header */}
@@ -303,6 +292,14 @@ export default function CommandCenterPage() {
           </div>
           
           <div className="flex items-center gap-3 flex-wrap">
+            {user?.role === 'SUPERADMIN' && (
+              <Link 
+                href="/superadmin"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-purple-950/20 border border-purple-500/20 px-5 py-3 text-sm font-semibold text-purple-300 hover:bg-purple-900/30 transition shadow-sm"
+              >
+                <ShieldAlert size={14} /> Back to Cockpit
+              </Link>
+            )}
             <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs text-emerald-400 font-semibold flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> System: Read-Only Visibility
             </span>

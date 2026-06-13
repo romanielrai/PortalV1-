@@ -51,6 +51,15 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Track all API requests dynamically for dashboard metrics
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    const { incrementApiCallCount } = require('./config-store');
+    incrementApiCallCount();
+  }
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/dashboard', dashboardRoutes);

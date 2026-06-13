@@ -1,4 +1,6 @@
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 
 // Stateful in-memory database tables
 const store: Record<string, any[]> = {
@@ -133,6 +135,40 @@ const store: Record<string, any[]> = {
     }
   ]
 };
+
+const DB_FILE_PATH = path.resolve(__dirname, '../prisma/db.json');
+
+function saveStore() {
+  try {
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(store, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Failed to save persistent mock database:', error);
+  }
+}
+
+// Load database on import
+try {
+  if (fs.existsSync(DB_FILE_PATH)) {
+    const rawData = fs.readFileSync(DB_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(rawData);
+    for (const key of Object.keys(parsed)) {
+      store[key] = parsed[key].map((item: any) => {
+        const processed = { ...item };
+        for (const prop of Object.keys(processed)) {
+          if (typeof processed[prop] === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(processed[prop])) {
+            processed[prop] = new Date(processed[prop]);
+          }
+        }
+        return processed;
+      });
+    }
+    console.log('Successfully loaded persistent mock database.');
+  } else {
+    saveStore();
+  }
+} catch (error) {
+  console.error('Failed to load persistent mock database:', error);
+}
 
 // Sub-query matching logic
 function matchesFilter(item: any, where: any): boolean {
@@ -283,6 +319,7 @@ function createModelProxy(name: string): any {
               }
 
               const result = Array.isArray(data) ? createdRecords : createdRecords[0];
+              saveStore();
               return resolveIncludes(modelName, result, args?.include);
             }
 
@@ -303,6 +340,7 @@ function createModelProxy(name: string): any {
                 const item = items.find(item => matchesFilter(item, args?.where));
                 if (item) {
                   Object.assign(item, parsedData, { updatedAt: new Date() });
+                  saveStore();
                   return resolveIncludes(modelName, item, args?.include);
                 }
                 throw new Error(`Record to update not found in ${modelName}`);
@@ -311,6 +349,7 @@ function createModelProxy(name: string): any {
                 matching.forEach(item => {
                   Object.assign(item, parsedData, { updatedAt: new Date() });
                 });
+                saveStore();
                 return { count: matching.length };
               }
             }
@@ -321,6 +360,7 @@ function createModelProxy(name: string): any {
                 const index = items.findIndex(item => matchesFilter(item, args?.where));
                 if (index !== -1) {
                   const deleted = items.splice(index, 1)[0];
+                  saveStore();
                   return resolveIncludes(modelName, deleted, args?.include);
                 }
                 throw new Error(`Record to delete not found in ${modelName}`);
@@ -328,6 +368,7 @@ function createModelProxy(name: string): any {
                 const initialLength = items.length;
                 store[modelName] = items.filter(item => !matchesFilter(item, args?.where));
                 const deletedCount = initialLength - store[modelName].length;
+                saveStore();
                 return { count: deletedCount };
               }
             }
@@ -350,6 +391,7 @@ function createModelProxy(name: string): any {
               ...parsedData
             };
             store[modelName].push(newRecord);
+            saveStore();
             return resolveIncludes(modelName, newRecord, args?.include);
           };
         }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Users, PhoneCall, CalendarDays, RefreshCw } from 'lucide-react';
+import { LogOut, Users, PhoneCall, CalendarDays, RefreshCw, ShieldAlert } from 'lucide-react';
 
 interface MetricData {
   leadsGenerated: number;
@@ -116,17 +116,6 @@ export default function UserDashboardPage() {
 
   return (
     <main className="mx-auto mt-28 max-w-7xl px-6 pb-24 md:px-12">
-      {user?.role === 'SUPERADMIN' && (
-        <div className="bg-purple-900/30 border border-purple-500/30 text-purple-200 px-5 py-4 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-semibold backdrop-blur-md mb-6">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-purple-400 animate-pulse" />
-            <span>Logged in as <strong className="text-purple-300">SUPERADMIN</strong>. You are accessing the **User Command Center / Database Sync (User Dashboard)** view.</span>
-          </div>
-          <Link href="/superadmin" className="rounded-full bg-purple-600 hover:bg-purple-500 text-white px-5 py-2 text-xs transition duration-200">
-            Back to Superadmin Cockpit
-          </Link>
-        </div>
-      )}
       <div className="rounded-[32px] border border-white/10 bg-glass p-8 md:p-10 shadow-glow">
         
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-white/5 pb-6">
@@ -138,7 +127,15 @@ export default function UserDashboardPage() {
             <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">Welcome Back, {user?.name || 'User'}</h1>
             <p className="text-xs text-white/50 mt-1">Role / Profile: {user?.role || 'USER'} Workspace ({user?.email})</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {user?.role === 'SUPERADMIN' && (
+              <Link 
+                href="/superadmin"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-purple-950/20 border border-purple-500/20 px-5 py-3 text-sm font-semibold text-purple-300 hover:bg-purple-900/30 transition shadow-sm"
+              >
+                <ShieldAlert size={16} /> Back to Cockpit
+              </Link>
+            )}
             <button 
               onClick={fetchDashboardData}
               className="inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 p-3 text-foreground hover:bg-white/10 hover:text-slate-400 transition"

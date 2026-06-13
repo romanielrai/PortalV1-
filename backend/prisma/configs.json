@@ -10,8 +10,8 @@
   "voiceProfile": "Rachel",
   "crmConnected": {
     "gohighlevel": true,
-    "hubspot": false,
-    "salesforce": false
+    "hubspot": true,
+    "salesforce": true
   },
   "kbEntries": [
     {
@@ -22,5 +22,6 @@
       "q": "Is there a contract?",
       "a": "All packages are month-to-month with no long-term contract."
     }
-  ]
+  ],
+  "publisherNote": "Delivery Agent Note: Integrated ServiceTitan. AI Callback rules successfully live."
 }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { getConfigs } from '../config-store';
+import { getConfigs, getApiCallCount } from '../config-store';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ router.get('/superadmin', requireAuth, requireRole('SUPERADMIN'), async (req, re
         totalUsers: userCount,
         activeClients: clientCount,
         totalLeads: leadCount,
-        apiCallsToday: 0
+        apiCallsToday: getApiCallCount()
       }
     });
   } catch (error) {

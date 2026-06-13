@@ -105,3 +105,13 @@ export function updateConfigs(updates: Partial<SystemConfigs>): SystemConfigs {
 
   return activeConfigs;
 }
+
+let apiCallCount = 0;
+
+export function incrementApiCallCount() {
+  apiCallCount++;
+}
+
+export function getApiCallCount() {
+  return apiCallCount;
+}

@@ -364,30 +364,86 @@ export default function SuperAdminPage() {
       <div className="rounded-[32px] border border-white/10 bg-glass p-8 md:p-10 shadow-glow">
 
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-start md:justify-between border-b border-white/5 pb-6">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/20 bg-purple-500/10 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-purple-400 mb-3">
-              <ShieldAlert size={12} /> Welcome, {user?.name || 'Superadmin'}
+        <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between border-b border-white/10 pb-8">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+              </span>
+              <span className="text-xs font-bold uppercase tracking-[0.25em] text-purple-400/90">Enterprise System Cockpit</span>
             </div>
-            <h1 className="text-3xl md:text-4xl font-semibold text-white">Enterprise system management ({user?.role || 'SUPERADMIN'}).</h1>
-            <p className="mt-3 max-w-2xl text-foreground/70 leading-relaxed">
-              Logged in as: <strong className="text-purple-300">{user?.email}</strong>. Full platform controls for user management, billing, AI configuration, and service health monitoring.
-            </p>
+            
+            <h1 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl bg-gradient-to-r from-white via-white to-purple-300 bg-clip-text text-transparent">
+              Superadmin Control Center
+            </h1>
+
+            {/* Systematic badging group (Look & Function) */}
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              {/* Identity Pill */}
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/5 px-3.5 py-1.5 text-xs text-white/80 backdrop-blur-md shadow-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+                <span className="font-semibold text-white/60">ID:</span>
+                <span className="text-white font-mono font-medium">{user?.email || 'superadmin@gmail.com'}</span>
+              </div>
+
+              {/* Role Badge */}
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 py-1.5 text-xs font-semibold text-purple-300 shadow-sm shadow-purple-500/5">
+                <ShieldAlert size={13} />
+                <span>{user?.role || 'SUPERADMIN'}</span>
+              </div>
+
+              {/* DB Status Pill */}
+              <div className="inline-flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-3.5 py-1.5 text-xs font-medium text-green-400">
+                <Database size={13} />
+                <span className="text-green-400/60 font-semibold">DB:</span>
+                <span>{healthData?.integrations?.databaseType || 'SQLite'}</span>
+              </div>
+
+              {/* OpenAI Status Pill */}
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium ${
+                healthData?.integrations?.openai === 'LIVE'
+                  ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                  : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400'
+              }`}>
+                <Brain size={13} />
+                <span className="opacity-60 font-semibold">AI:</span>
+                <span>{healthData?.integrations?.openai || 'SIMULATED'}</span>
+              </div>
+
+              {/* Twilio Status Pill */}
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium ${
+                healthData?.integrations?.twilio === 'LIVE'
+                  ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                  : 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400'
+              }`}>
+                <Phone size={13} />
+                <span className="opacity-60 font-semibold">Voice:</span>
+                <span>{healthData?.integrations?.twilio || 'SIMULATED'}</span>
+              </div>
+            </div>
           </div>
           
-          <div className="flex gap-3 self-start">
+          {/* Action controls */}
+          <div className="flex items-center gap-3.5 sm:self-start lg:self-center">
             <button
-               onClick={() => fetchDashboardData(localStorage.getItem('token') || '')}
-               className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-foreground transition hover:bg-white/10 hover:text-purple-400"
+               onClick={() => {
+                 const token = localStorage.getItem('token') || '';
+                 fetchDashboardData(token);
+                 fetchSystemHealth(token);
+                 fetchConfigs(token);
+               }}
+               className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10 hover:text-purple-400 active:scale-95 shadow-md"
             >
-               <RefreshCw size={15} />
-               Refresh
+               <RefreshCw size={14} />
+               <span>Sync Panel</span>
             </button>
             <button 
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-full bg-red-950/20 border border-red-500/20 px-4 py-2.5 text-sm font-medium text-red-300 hover:bg-red-900/30 transition shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full bg-red-950/30 border border-red-500/20 px-5 py-3 text-sm font-semibold text-red-300 hover:bg-red-900/40 transition active:scale-95 shadow-md"
             >
-               <LogOut size={15} /> Logout
+               <LogOut size={14} /> 
+               <span>Secure Sign Out</span>
             </button>
           </div>
         </div>
