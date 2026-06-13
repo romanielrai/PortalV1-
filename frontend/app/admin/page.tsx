@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Users, PhoneCall, LogOut, X, Plus, Sliders, 
-  Upload, Link2, MessageSquare, AlertTriangle, PlayCircle, ShieldAlert
+  Upload, Link2, MessageSquare, AlertTriangle, PlayCircle, ShieldAlert, Sparkles, Clock
 } from 'lucide-react';
 
 interface Client {
@@ -30,13 +30,17 @@ export default function AgentDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
-  const [activeTab, setActiveTab] = useState<'clients' | 'voice' | 'engine' | 'reactivation' | 'crm' | 'inbox'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'voice' | 'engine' | 'reactivation' | 'crm' | 'inbox' | 'coach'>('clients');
   const [user, setUser] = useState<{ name?: string; role?: string; email?: string } | null>(null);
 
   // Client Manager State
   const [clients, setClients] = useState<Client[]>(initialClients);
   const [showAddClient, setShowAddClient] = useState(false);
   const [newClient, setNewClient] = useState({ companyName: '', contactName: '', contactEmail: '', contactPhone: '', plan: 'GROWTH', industry: 'Septic & Drain', revenueBracket: '$5M–$15M' });
+
+  // AI Coach & Call Analytics States
+  const [callsList, setCallsList] = useState<any[]>([]);
+  const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
 
   // AI Voice Builder State
   const [selectedVoiceIndustry, setSelectedVoiceIndustry] = useState('septic');
@@ -96,6 +100,25 @@ export default function AgentDashboard() {
     }
   };
 
+  const fetchCalls = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/admin/calls', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCallsList(data.calls ?? []);
+        if (data.calls?.length > 0 && !selectedCallId) {
+          setSelectedCallId(data.calls[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching calls coaching analytics:', err);
+    }
+  };
+
   const fetchConfigs = async () => {
     const token = localStorage.getItem('token');
     if (!token) return;
@@ -134,6 +157,7 @@ export default function AgentDashboard() {
         setAuthorized(true);
         fetchClients();
         fetchConfigs();
+        fetchCalls();
       } else {
         router.push('/login');
       }
@@ -355,6 +379,7 @@ export default function AgentDashboard() {
             { id: 'voice', label: 'AI Voice Builder', icon: <Sliders size={14} /> },
             { id: 'engine', label: 'Missed Call Engine', icon: <PhoneCall size={14} /> },
             { id: 'reactivation', label: 'Reactivation Launcher', icon: <Upload size={14} /> },
+            { id: 'coach', label: 'AI Coach & Scoring', icon: <Sparkles size={14} /> },
             { id: 'crm', label: 'CRM Integrations', icon: <Link2 size={14} /> },
             { id: 'inbox', label: 'Internal Inbox', icon: <MessageSquare size={14} /> }
           ].map((tab) => (
@@ -902,6 +927,258 @@ export default function AgentDashboard() {
               ) : (
                 <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-10 text-center text-white/40">
                   Select a message from the sidebar to inspect conversation transcript.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: AI COACH & CALL SCORING */}
+        {activeTab === 'coach' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Sparkles className="text-gold h-5 w-5" />
+                Avoca AI Coach & Call Scoring
+              </h2>
+              <p className="text-xs text-white/50">
+                Monitor inbound/outbound AI conversation quality. Review speaker transcripts, sentiment compliance, and coaching notes.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-[350px_1fr]">
+              {/* Left Pane: Calls List */}
+              <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-4 flex flex-col gap-3 max-h-[700px] overflow-y-auto">
+                <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                  <span className="text-[10px] uppercase font-bold text-white/45 tracking-wider">Conversation Logs</span>
+                  <span className="text-[10px] font-semibold text-gold bg-gold/10 px-2 py-0.5 rounded-full border border-gold/20">
+                    {callsList.length} Calls Loaded
+                  </span>
+                </div>
+                
+                {callsList.length === 0 ? (
+                  <p className="text-xs text-white/40 text-center py-6">No call logs found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {callsList.map((call: any) => {
+                      const avgScore = call.coaching
+                        ? Math.round((call.coaching.greeting + call.coaching.compliance) / 2)
+                        : 0;
+                      const isSelected = selectedCallId === call.id;
+
+                      return (
+                        <button
+                          key={call.id}
+                          onClick={() => setSelectedCallId(call.id)}
+                          className={`w-full rounded-xl p-3 text-left border transition-all duration-200 flex flex-col gap-1.5 ${
+                            isSelected
+                              ? 'bg-gold/10 border-gold/60 shadow-glow-sm'
+                              : 'bg-white/5 border-white/5 text-white/70 hover:bg-white/10 hover:border-white/10 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start w-full gap-2">
+                            <div className="truncate">
+                              <p className="text-xs font-bold text-white truncate">{call.leadName}</p>
+                              <p className="text-[10px] text-white/40 truncate">{call.phone}</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold border ${
+                                call.outcome === 'BOOKED'
+                                  ? 'bg-emerald-950 text-emerald-400 border-emerald-500/20'
+                                  : call.outcome === 'VOICEMAIL'
+                                  ? 'bg-amber-950 text-amber-400 border-amber-500/20'
+                                  : 'bg-blue-950 text-blue-400 border-blue-500/20'
+                              }`}>
+                                {call.outcome}
+                              </span>
+                              {avgScore > 0 && (
+                                <span className={`text-[10px] font-bold ${
+                                  avgScore >= 90 ? 'text-emerald-400' : avgScore >= 80 ? 'text-gold' : 'text-amber-500'
+                                }`}>
+                                  AI Score: {avgScore}%
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center text-[9px] text-white/40 mt-1 border-t border-white/5 pt-1.5">
+                            <span className="flex items-center gap-1">
+                              <Clock size={10} />
+                              {call.durationSec ? `${Math.floor(call.durationSec / 60)}m ${call.durationSec % 60}s` : '0s'}
+                            </span>
+                            <span>{new Date(call.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Pane: Selected Call Analysis */}
+              {selectedCallId && callsList.find((c: any) => c.id === selectedCallId) ? (
+                (() => {
+                  const call = callsList.find((c: any) => c.id === selectedCallId);
+                  const avgScore = call.coaching
+                    ? Math.round((call.coaching.greeting + call.coaching.compliance) / 2)
+                    : 0;
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Player panel */}
+                      <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                          <div>
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                              <span>Coaching Analysis:</span>
+                              <span className="text-gold font-medium">{call.leadName}</span>
+                            </h3>
+                            <p className="text-[10px] text-white/40 mt-0.5">Call ID: {call.id} • {call.phone}</p>
+                          </div>
+                          <span className={`text-[10px] uppercase font-bold tracking-wider rounded-md px-2 py-1 border ${
+                            call.initiatedBy === 'system' 
+                              ? 'bg-purple-950/40 text-purple-300 border-purple-500/20' 
+                              : 'bg-blue-950/40 text-blue-300 border-blue-500/20'
+                          }`}>
+                            {call.initiatedBy === 'system' ? '🤖 AI Autodial' : '👤 Agent Handled'}
+                          </span>
+                        </div>
+
+                        {/* Simulated audio waveform */}
+                        <div className="bg-[#04081c]/60 border border-white/5 rounded-xl p-4 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <button className="h-9 w-9 rounded-full bg-gold hover:brightness-110 flex items-center justify-center text-background shadow-md transition-all">
+                              <PlayCircle className="h-5 w-5" />
+                            </button>
+                            <div className="flex-1 space-y-1">
+                              {/* Waveform bars */}
+                              <div className="flex items-end justify-between h-8 gap-[2px] px-2">
+                                {[30, 45, 60, 40, 20, 35, 70, 80, 50, 25, 45, 60, 30, 20, 55, 75, 90, 85, 40, 30, 65, 80, 50, 40, 70, 60, 30, 45, 60, 40, 20, 35, 70, 80, 50, 25, 45, 60, 30, 20, 55, 75, 90, 85, 40, 30, 65, 80, 50, 40].map((h, i) => (
+                                  <div
+                                    key={i}
+                                    style={{ height: `${h}%` }}
+                                    className={`w-full rounded-t-sm transition-all duration-300 ${
+                                      i < 20 ? 'bg-gold' : 'bg-white/10'
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex justify-between text-[9px] text-white/30 px-1 font-mono">
+                                <span>0:24</span>
+                                <span>/ {call.durationSec ? `${Math.floor(call.durationSec / 60)}:${(call.durationSec % 60).toString().padStart(2, '0')}` : '0:00'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Metrics Grid */}
+                        <div className="grid gap-3 sm:grid-cols-4">
+                          <div className="bg-[#04081c]/50 border border-white/5 rounded-xl p-3 text-center space-y-1">
+                            <span className="text-[10px] text-white/40 block">Overall AI Score</span>
+                            <span className={`text-xl font-extrabold ${
+                              avgScore >= 90 ? 'text-emerald-400' : avgScore >= 80 ? 'text-gold' : 'text-amber-500'
+                            }`}>{avgScore}%</span>
+                            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                              <div style={{ width: `${avgScore}%` }} className={`h-full ${
+                                avgScore >= 90 ? 'bg-emerald-400' : avgScore >= 80 ? 'bg-gold' : 'bg-amber-500'
+                              }`} />
+                            </div>
+                          </div>
+
+                          <div className="bg-[#04081c]/50 border border-white/5 rounded-xl p-3 text-center space-y-1">
+                            <span className="text-[10px] text-white/40 block">Greeting Quality</span>
+                            <span className="text-xl font-extrabold text-white">{call.coaching?.greeting}%</span>
+                            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                              <div style={{ width: `${call.coaching?.greeting}%` }} className="h-full bg-blue-400" />
+                            </div>
+                          </div>
+
+                          <div className="bg-[#04081c]/50 border border-white/5 rounded-xl p-3 text-center space-y-1">
+                            <span className="text-[10px] text-white/40 block">Script Compliance</span>
+                            <span className="text-xl font-extrabold text-white">{call.coaching?.compliance}%</span>
+                            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                              <div style={{ width: `${call.coaching?.compliance}%` }} className="h-full bg-purple-400" />
+                            </div>
+                          </div>
+
+                          <div className="bg-[#04081c]/50 border border-white/5 rounded-xl p-3 text-center space-y-1">
+                            <span className="text-[10px] text-white/40 block">Sentiment</span>
+                            <span className={`text-sm font-extrabold block py-1.5 ${
+                              call.coaching?.sentiment === 'Positive' 
+                                ? 'text-emerald-400' 
+                                : call.coaching?.sentiment === 'Neutral' 
+                                ? 'text-yellow-400' 
+                                : 'text-red-400'
+                            }`}>{call.coaching?.sentiment || 'Neutral'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* AI Coaching Notes & Insights */}
+                      <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 space-y-3">
+                        <div className="flex items-center gap-2 pb-2 border-b border-white/5">
+                          <Sparkles className="text-gold h-4 w-4" />
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">AI Coaching Insights</h4>
+                        </div>
+                        <p className="text-xs text-white/80 leading-relaxed bg-[#04081c]/40 border border-white/5 rounded-xl p-3.5 italic">
+                          &quot;{call.coaching?.coachingNotes || 'No notes available for this session.'}&quot;
+                        </p>
+                      </div>
+
+                      {/* Transcript Analysis */}
+                      <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-5 space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="text-white/40 h-4 w-4" />
+                            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Speaker Transcript</h4>
+                          </div>
+                          <span className="text-[9px] text-white/40 font-mono">Parsed Live Feed</span>
+                        </div>
+
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                          {call.coaching?.transcript?.split('\n').map((line: string, i: number) => {
+                            const isAI = line.startsWith('[AI]');
+                            const isCaller = line.startsWith('[Caller]');
+                            const isSystem = line.startsWith('[System]');
+                            
+                            const cleanText = line.replace(/^\[(AI|Caller|System)\]:\s*/, '');
+
+                            if (isSystem) {
+                              return (
+                                <div key={i} className="text-center py-1">
+                                  <span className="inline-block text-[9px] font-semibold text-white/40 bg-white/5 rounded px-2 py-0.5 font-mono">
+                                    {cleanText}
+                                  </span>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div key={i} className={`flex ${isAI ? 'justify-start' : 'justify-end'}`}>
+                                <div className={`max-w-[85%] rounded-xl p-3 text-xs ${
+                                  isAI 
+                                    ? 'bg-gold/10 border border-gold/20 text-white rounded-tl-none' 
+                                    : 'bg-white/5 border border-white/5 text-white/95 rounded-tr-none'
+                                }`}>
+                                  <span className={`text-[9px] font-bold uppercase block mb-1 tracking-wider ${
+                                    isAI ? 'text-gold' : 'text-purple-400'
+                                  }`}>
+                                    {isAI ? '🤖 AI Receptionist' : '👤 Customer'}
+                                  </span>
+                                  <p className="leading-relaxed">{cleanText}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-[#060e26]/50 p-10 text-center text-white/40 flex flex-col items-center justify-center min-h-[300px]">
+                  <Sparkles size={32} className="text-white/20 mb-3 animate-pulse" />
+                  <p className="text-xs font-semibold">Select a call from the log roster to view deep visual analytics and quality scores.</p>
                 </div>
               )}
             </div>

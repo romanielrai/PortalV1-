@@ -393,14 +393,13 @@ export default function SuperAdminPage() {
                 <span>{user?.role || 'SUPERADMIN'}</span>
               </div>
 
-              {/* DB Status Pill */}
+              {/* DB, AI, and Voice badges hidden by user request
               <div className="inline-flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-3.5 py-1.5 text-xs font-medium text-green-400">
                 <Database size={13} />
                 <span className="text-green-400/60 font-semibold">DB:</span>
                 <span>{healthData?.integrations?.databaseType || 'SQLite'}</span>
               </div>
 
-              {/* OpenAI Status Pill */}
               <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium ${
                 healthData?.integrations?.openai === 'LIVE'
                   ? 'border-green-500/30 bg-green-500/10 text-green-400'
@@ -411,7 +410,6 @@ export default function SuperAdminPage() {
                 <span>{healthData?.integrations?.openai || 'SIMULATED'}</span>
               </div>
 
-              {/* Twilio Status Pill */}
               <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium ${
                 healthData?.integrations?.twilio === 'LIVE'
                   ? 'border-green-500/30 bg-green-500/10 text-green-400'
@@ -421,6 +419,7 @@ export default function SuperAdminPage() {
                 <span className="opacity-60 font-semibold">Voice:</span>
                 <span>{healthData?.integrations?.twilio || 'SIMULATED'}</span>
               </div>
+              */}
             </div>
           </div>
           

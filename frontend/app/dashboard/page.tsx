@@ -312,11 +312,12 @@ export default function CommandCenterPage() {
           </div>
         </div>
 
-        {/* Live Publisher Notes */}
+        {/* Live Publisher Notes - Hidden by user request
         <div className="rounded-2xl border border-gold/20 bg-gold/5 px-4 py-3 flex items-center gap-2.5 text-xs text-gold/90">
           <Sparkles className="h-4 w-4 flex-shrink-0 text-gold" />
           <span><strong>Publisher update:</strong> {latestFeedNotes}</span>
         </div>
+        */}
 
         {/* Stats Row */}
         <div className="grid gap-4 sm:grid-cols-3">
