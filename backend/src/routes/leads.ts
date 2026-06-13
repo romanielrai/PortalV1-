@@ -4,6 +4,34 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+function parseSlotToDate(slot: string): Date {
+  const now = new Date();
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  
+  const slotLower = slot.toLowerCase();
+  let targetDayIndex = days.findIndex(day => slotLower.includes(day));
+  if (targetDayIndex === -1) targetDayIndex = 1;
+
+  let daysDiff = targetDayIndex - now.getDay();
+  if (daysDiff <= 0) daysDiff += 7;
+  
+  const targetDate = new Date(now.getTime() + daysDiff * 24 * 60 * 60 * 1000);
+
+  let hour = 10;
+  let minute = 0;
+  const match = slot.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (match) {
+    hour = parseInt(match[1]);
+    minute = parseInt(match[2]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && hour < 12) hour += 12;
+    if (ampm === 'AM' && hour === 12) hour = 0;
+  }
+
+  targetDate.setHours(hour, minute, 0, 0);
+  return targetDate;
+}
+
 router.post('/', async (req: AuthRequest, res) => {
   try {
     const { name, email, phone, business, source, clientId } = req.body;
@@ -23,6 +51,25 @@ router.post('/', async (req: AuthRequest, res) => {
         clientId: clientId || 'client-default'
       }
     });
+
+    if (source && (source.startsWith('Demo Booking –') || source.startsWith('Demo Booking -') || source.startsWith('Demo Booking'))) {
+      try {
+        const slotText = source.replace(/Demo Booking\s*[\-\–]\s*/i, '').trim();
+        const scheduledAt = parseSlotToDate(slotText);
+        await prisma.appointment.create({
+          data: {
+            clientId: lead.clientId,
+            leadId: lead.id,
+            title: `AI Consultation: ${lead.name} (${lead.business || 'New Lead'})`,
+            scheduledAt,
+            status: 'PENDING',
+            notes: `Auto-scheduled from site demo booking form. Slot requested: ${slotText}`
+          }
+        });
+      } catch (err) {
+        console.error('Failed to auto-create appointment for booked demo lead:', err);
+      }
+    }
 
     return res.json({ lead });
   } catch (error) {
