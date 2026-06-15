@@ -41,7 +41,9 @@ router.post('/login', async (req, res) => {
         name: user.name,
         role: user.role.name,
         phone: user.client?.contactPhone || '',
-        business: user.client?.companyName || ''
+        business: user.client?.companyName || '',
+        agentId: user.agentId || '',
+        clientId: user.clientId || ''
       } 
     });
   } catch (error) {
@@ -102,7 +104,9 @@ router.post('/register', async (req, res) => {
         name: user.name,
         role: role.name,
         phone: client?.contactPhone || '',
-        business: client?.companyName || ''
+        business: client?.companyName || '',
+        agentId: user.agentId || '',
+        clientId: user.clientId || ''
       } 
     });
   } catch (error) {
@@ -129,7 +133,9 @@ router.get('/profile', requireAuth, async (req: AuthRequest, res) => {
         name: user.name,
         role: user.role.name,
         phone: user.client?.contactPhone || '',
-        business: user.client?.companyName || ''
+        business: user.client?.companyName || '',
+        agentId: user.agentId || '',
+        clientId: user.clientId || ''
       }
     });
   } catch (error) {
@@ -212,7 +218,9 @@ router.patch('/profile', requireAuth, async (req: AuthRequest, res) => {
         name: updatedUser.name,
         role: updatedUser.role.name,
         phone: updatedUser.client?.contactPhone || phone || '',
-        business: updatedUser.client?.companyName || business || ''
+        business: updatedUser.client?.companyName || business || '',
+        agentId: updatedUser.agentId || '',
+        clientId: updatedUser.clientId || ''
       }
     });
   } catch (error) {

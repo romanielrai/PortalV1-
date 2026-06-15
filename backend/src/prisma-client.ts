@@ -5,10 +5,10 @@ import path from 'path';
 // Stateful in-memory database tables
 const store: Record<string, any[]> = {
   role: [
-    { id: 'role-admin', name: 'ADMIN', description: 'Administrator' },
-    { id: 'role-superadmin', name: 'SUPERADMIN', description: 'Super Administrator' },
-    { id: 'role-client', name: 'CLIENT', description: 'Client User' },
-    { id: 'role-user', name: 'USER', description: 'Regular User' }
+    { id: 'role-superadmin', name: 'SUPERADMIN', description: 'Platform Owner / Super Administrator' },
+    { id: 'role-admin', name: 'ADMIN', description: 'System Administrator' },
+    { id: 'role-client', name: 'CLIENT', description: 'CRM Platform Client' },
+    { id: 'role-agent', name: 'AGENT', description: 'Outbound Dialing Agent' }
   ],
   user: [
     {
@@ -19,121 +19,134 @@ const store: Record<string, any[]> = {
       roleId: 'role-superadmin'
     },
     {
-      id: 'user-admin',
-      email: 'admin@gmail.com',
-      name: 'Administrator',
+      id: 'user-client',
+      email: 'client@gmail.com',
+      name: 'John Doe',
       passwordHash: bcrypt.hashSync('AdminPass123!', 12),
-      roleId: 'role-admin'
+      roleId: 'role-client',
+      clientId: 'client-1'
+    },
+    {
+      id: 'user-agent',
+      email: 'agent@gmail.com',
+      name: 'John Connor',
+      passwordHash: bcrypt.hashSync('AdminPass123!', 12),
+      roleId: 'role-agent',
+      agentId: 'agent-1'
     }
   ],
   client: [
     {
-      id: 'client-default',
-      companyName: 'Default Client Corp',
+      id: 'client-1',
+      companyName: 'Septic & Drain Specialists',
       contactName: 'John Doe',
-      contactEmail: 'john@example.com',
-      contactPhone: '1234567890',
-      plan: 'GROWTH'
+      contactEmail: 'client@gmail.com',
+      contactPhone: '555-0188',
+      status: 'ACTIVE'
+    }
+  ],
+  agent: [
+    {
+      id: 'agent-1',
+      name: 'John Connor',
+      email: 'agent@gmail.com',
+      phone: '555-0122',
+      capacity: 1000,
+      activeTasks: 2,
+      completionRate: 92.4,
+      status: 'AVAILABLE'
+    },
+    {
+      id: 'agent-2',
+      name: 'Sarah Connor',
+      email: 'sarah@resistance.net',
+      phone: '555-0199',
+      capacity: 1000,
+      activeTasks: 0,
+      completionRate: 95.0,
+      status: 'AVAILABLE'
+    }
+  ],
+  project: [
+    {
+      id: 'proj-1',
+      name: 'Spring Leads Outreach',
+      clientId: 'client-1',
+      status: 'PENDING_APPROVAL',
+      progress: 0,
+      agentId: null,
+      startDate: null,
+      estCompletion: null,
+      actualCompletion: null,
+      createdAt: new Date(Date.now() - 3600000)
+    },
+    {
+      id: 'proj-2',
+      name: 'Cold Pipe Outbound 2026',
+      clientId: 'client-1',
+      status: 'IN_PROGRESS',
+      progress: 50,
+      agentId: 'agent-1',
+      startDate: new Date(Date.now() - 86400000 * 2),
+      estCompletion: new Date(Date.now() + 86400000 * 4),
+      actualCompletion: null,
+      createdAt: new Date(Date.now() - 86400000 * 2)
+    }
+  ],
+  uploadedfile: [
+    {
+      id: 'file-1',
+      fileName: 'leads_500.csv',
+      fileType: 'CSV',
+      recordCount: 500,
+      status: 'PENDING_APPROVAL',
+      clientId: 'client-1',
+      projectId: 'proj-1',
+      createdAt: new Date(Date.now() - 3600000)
+    },
+    {
+      id: 'file-2',
+      fileName: 'spring_leads.xlsx',
+      fileType: 'Excel',
+      recordCount: 1000,
+      status: 'APPROVED',
+      clientId: 'client-1',
+      projectId: 'proj-2',
+      createdAt: new Date(Date.now() - 86400000 * 2)
     }
   ],
   lead: [
+    { id: 'lead-1', name: 'Sarah Connor', company: 'Cyberdyne Systems', phone: '555-0199', email: 'sarah@skynet.com', notes: 'Interested in missed call recovery.', status: 'NEW', projectId: 'proj-2', createdAt: new Date() },
+    { id: 'lead-2', name: 'Kyle Reese', company: 'Resistance Security', phone: '555-0122', email: 'kyle@resistance.net', notes: 'Wants automated voice test dial.', status: 'FOLLOW_UP', projectId: 'proj-2', createdAt: new Date() },
+    { id: 'lead-3', name: 'Marcus Wright', company: 'Project Angel Inc', phone: '555-0187', email: 'marcus@angel.org', notes: 'Objection handled - call scheduled.', status: 'INTERESTED', projectId: 'proj-2', createdAt: new Date() },
+    { id: 'lead-4', name: 'Peter Silberman', company: 'County Hospital', phone: '555-0134', email: 'silberman@hospital.org', notes: 'No answer, retry tomorrow.', status: 'NO_ANSWER', projectId: 'proj-2', createdAt: new Date() }
+  ],
+  assignment: [
     {
-      id: 'lead-1',
-      name: 'Sarah Connor',
-      email: 'sarah@skynet.com',
-      phone: '555-0199',
-      business: 'Tech Corp',
-      status: 'NEW',
-      source: 'Web Form',
-      clientId: 'client-default',
-      createdAt: new Date()
-    },
-    {
-      id: 'lead-2',
-      name: 'John Connor',
-      email: 'john@resistance.net',
-      phone: '555-0122',
-      business: 'Security Inc',
-      status: 'CONTACTED',
-      source: 'Missed Call',
-      clientId: 'client-default',
-      createdAt: new Date(Date.now() - 3600000)
+      id: 'assign-1',
+      projectId: 'proj-2',
+      agentId: 'agent-1',
+      recordCount: 1000,
+      status: 'ASSIGNED',
+      createdAt: new Date(Date.now() - 86400000 * 2)
     }
   ],
-  call: [],
-  sms: [],
-  email: [],
-  appointment: [
-    {
-      id: 'appt-1',
-      clientId: 'client-default',
-      leadId: 'lead-1',
-      title: 'AI Receptionist Onboarding Consultation',
-      scheduledAt: new Date(Date.now() + 86400000 * 2), // 2 days in future
-      durationMin: 30,
-      status: 'PENDING',
-      notes: 'Wants custom script for tech support agency.'
-    },
-    {
-      id: 'appt-2',
-      clientId: 'client-default',
-      leadId: 'lead-2',
-      title: 'Missed Call Recovery Deep Dive',
-      scheduledAt: new Date(Date.now() + 86400000 * 4), // 4 days in future
-      durationMin: 45,
-      status: 'CONFIRMED',
-      notes: 'Interested in GHL integration.'
-    }
+  notification: [
+    { id: 'notif-1', userId: 'user-client', title: 'Database Upload Queued', message: 'leads_500.csv (500 records) is pending Super Admin approval.', channel: 'ALL', read: false, createdAt: new Date(Date.now() - 3600000) },
+    { id: 'notif-2', userId: 'user-client', title: 'Agent Assigned', message: 'Agent John Connor has been assigned to Spring Tank Callouts.', channel: 'IN_APP', read: true, createdAt: new Date(Date.now() - 86400000) }
   ],
-  chatbotlog: [
-    {
-      id: 'chatlog-1',
-      sessionId: 'sess-123',
-      role: 'user',
-      message: 'Hello, what are your pricing packages?',
-      createdAt: new Date(Date.now() - 300000)
-    },
-    {
-      id: 'chatlog-2',
-      sessionId: 'sess-123',
-      role: 'assistant',
-      message: 'We have three packages designed for real ROI. The Starter at $1,497/mo, Growth at $2,997/mo, and Dominance at $5,997/mo. Which of these sounds like the right fit for your business?',
-      createdAt: new Date(Date.now() - 280000)
-    },
-    {
-      id: 'chatlog-3',
-      sessionId: 'sess-123',
-      role: 'user',
-      message: 'I am interested in Growth.',
-      createdAt: new Date(Date.now() - 250000)
-    },
-    {
-      id: 'chatlog-4',
-      sessionId: 'sess-123',
-      role: 'assistant',
-      message: 'Great choice! The Growth plan includes missed call recovery, CRM integration, and bi-weekly strategy calls. Would you like to book a demo call to get started?',
-      createdAt: new Date(Date.now() - 240000)
-    }
+  activitylog: [
+    { id: 'act-1', userId: 'user-client', action: 'Database uploaded', details: 'leads_500.csv (500 records) uploaded by Client John Doe.', createdAt: new Date(Date.now() - 3600000) },
+    { id: 'act-2', userId: 'user-client', action: 'Approved by Super Admin', details: 'Database spring_leads.xlsx approved by Super Admin.', createdAt: new Date(Date.now() - 86400000 * 1.5) },
+    { id: 'act-3', userId: 'user-client', action: 'Assigned to Agent John', details: 'Project assigned to Agent John Connor.', createdAt: new Date(Date.now() - 86400000) },
+    { id: 'act-4', userId: 'user-client', action: 'Agent started calling', details: 'John Connor started outbound dials on project Spring Tank.', createdAt: new Date(Date.now() - 43200000) }
   ],
-  voicelog: [],
+  voicetest: [],
+  calltranscript: [],
   auditlog: [
-    {
-      id: 'audit-1',
-      action: 'SYSTEM_BOOT',
-      actor: 'system',
-      details: 'Express Server bootstrapped with in-memory database configuration',
-      ipAddress: '127.0.0.1',
-      createdAt: new Date(Date.now() - 1000 * 60 * 10)
-    },
-    {
-      id: 'audit-2',
-      action: 'USER_LOGIN',
-      actor: 'superadmin@gmail.com',
-      details: 'Super administrator logged in successfully',
-      ipAddress: '127.0.0.1',
-      createdAt: new Date(Date.now() - 1000 * 60 * 5)
-    }
-  ]
+    { id: 'audit-1', userId: 'user-superadmin', action: 'SYSTEM_BOOT', actor: 'system', details: 'CRM Platform database client instantiated in-memory.', ipAddress: '127.0.0.1', createdAt: new Date() }
+  ],
+  chatbotlog: []
 };
 
 const DB_FILE_PATH = path.resolve(__dirname, '../prisma/db.json');
@@ -194,7 +207,7 @@ function matchesFilter(item: any, where: any): boolean {
   return true;
 }
 
-// Deep resolver for Prisma includes (role relation etc.)
+// Deep resolver for Prisma includes
 function resolveIncludes(modelName: string, item: any, include: any): any {
   if (!item || !include) return item;
   const resolved = { ...item };
@@ -210,6 +223,38 @@ function resolveIncludes(modelName: string, item: any, include: any): any {
     if (relation === 'client' && modelName === 'user') {
       const client = store.client.find(c => c.id === item.clientId);
       resolved.client = client ?? null;
+    }
+
+    if (relation === 'agent' && modelName === 'user') {
+      const agent = store.agent.find(a => a.id === item.agentId);
+      resolved.agent = agent ?? null;
+    }
+
+    if (relation === 'client' && modelName === 'project') {
+      const client = store.client.find(c => c.id === item.clientId);
+      resolved.client = client ?? null;
+    }
+
+    if (relation === 'agent' && modelName === 'project') {
+      const agent = store.agent.find(a => a.id === item.agentId);
+      resolved.agent = agent ?? null;
+    }
+
+    if (relation === 'leads' && modelName === 'project') {
+      resolved.leads = store.lead.filter(l => l.projectId === item.id);
+    }
+
+    if (relation === 'assignments' && modelName === 'project') {
+      resolved.assignments = store.assignment.filter(a => a.projectId === item.id);
+    }
+
+    if (relation === 'uploadedFiles' && modelName === 'project') {
+      resolved.uploadedFiles = store.uploadedfile.filter(f => f.projectId === item.id);
+    }
+
+    if (relation === 'user' && modelName === 'notification') {
+      const u = store.user.find(usr => usr.id === item.userId);
+      resolved.user = u ?? null;
     }
   }
   return resolved;

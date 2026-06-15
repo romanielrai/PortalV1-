@@ -16,13 +16,16 @@ model User {
   role          Role         @relation(fields: [roleId], references: [id])
   roleId        String
   client        Client?      @relation(fields: [clientId], references: [id])
-  clientId      String?      
+  clientId      String?
+  agent         Agent?       @relation(fields: [agentId], references: [id])
+  agentId       String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   leads         Lead[]
-  appointments  Appointment[]
   auditLogs     AuditLog[]
   chatbotLogs   ChatbotLog[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
 }
 
 model Role {
@@ -41,182 +44,154 @@ model Permission {
 }
 
 model Client {
-  id             String        @id @default(uuid())
+  id             String         @id @default(uuid())
   companyName    String
   contactName    String
   contactEmail   String
   contactPhone   String
-  plan           String        @default("STARTER")
-  industry       String?
-  status         String        @default("ACTIVE")
+  status         String         @default("ACTIVE")
   userAccounts   User[]
+  projects       Project[]
+  uploadedFiles  UploadedFile[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Agent {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  phone          String
+  capacity       Int            @default(1000)
+  activeTasks    Int            @default(0)
+  completionRate Float          @default(0.0)
+  status         String         @default("AVAILABLE")
+  userAccounts   User[]
+  assignments    Assignment[]
+  projects       Project[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Project {
+  id             String         @id @default(uuid())
+  name           String
+  client         Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId       String
+  status         String         @default("PENDING_APPROVAL") // PENDING_APPROVAL, APPROVED, AGENT_ASSIGNED, WORK_STARTED, IN_PROGRESS, COMPLETED
+  progress       Int            @default(0) // 0, 25, 50, 75, 100
+  agent          Agent?         @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  agentId        String?
+  startDate      DateTime?
+  estCompletion  DateTime?
+  actualCompletion DateTime?
+  uploadedFiles  UploadedFile[]
   leads          Lead[]
-  appointments   Appointment[]
-  campaigns      Campaign[]
-  calls          Call[]
-  smsMessages    SMS[]
-  emails         Email[]
-  subscriptions  Subscription[]
-  invoices       Invoice[]
-  payments       Payment[]
-  voiceLogs      VoiceLog[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  assignments    Assignment[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model UploadedFile {
+  id             String         @id @default(uuid())
+  fileName       String
+  fileType       String
+  recordCount    Int
+  status         String         @default("PENDING_APPROVAL")
+  client         Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId       String
+  project        Project?       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
 model Lead {
-  id          String      @id @default(uuid())
-  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userId      String?
-  name        String
-  email       String
-  phone       String
-  business    String
-  status      String      @default("NEW")
-  source      String
-  notes       String?     @db.Text
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  appointments Appointment[]
-  chatbotLogs  ChatbotLog[]
-  calls       Call[]
-  sms         SMS[]
-  emails      Email[]
+  id             String         @id @default(uuid())
+  name           String
+  company        String
+  phone          String
+  email          String
+  notes          String?        @db.Text
+  status         String         @default("NEW") // NEW, CONTACTED, NO_ANSWER, INTERESTED, FOLLOW_UP, CLOSED
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId         String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
-model Appointment {
-  id          String    @id @default(uuid())
-  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  lead        Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  leadId      String?
-  title       String
-  scheduledAt DateTime
-  status      String    @default("PENDING")
-  notes       String?   @db.Text
-  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdById String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model Assignment {
+  id             String         @id @default(uuid())
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  agent          Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId        String
+  recordCount    Int
+  status         String         @default("ASSIGNED")
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 }
 
-model Campaign {
-  id          String    @id @default(uuid())
-  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  name        String
-  type        String    @default("LEAD_REACTIVATION")
-  status      String    @default("ACTIVE")
-  startDate   DateTime
-  endDate     DateTime?
-  budget      Float?
-  notes       String?   @db.Text
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model Notification {
+  id             String         @id @default(uuid())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  title          String
+  message        String         @db.Text
+  channel        String         @default("IN_APP") // IN_APP, EMAIL, SMS, ALL
+  read           Boolean        @default(false)
+  createdAt      DateTime       @default(now())
 }
 
-model Call {
-  id            String      @id @default(uuid())
-  client        Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId      String
-  lead          Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  leadId        String?
-  initiatedBy   String
-  durationSec   Int
-  outcome       String
-  recordingUrl  String?
-  createdAt     DateTime    @default(now())
+model ActivityLog {
+  id             String         @id @default(uuid())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  action         String
+  details        String         @db.Text
+  ipAddress      String?
+  createdAt      DateTime       @default(now())
 }
 
-model SMS {
-  id          String   @id @default(uuid())
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  lead        Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  leadId      String?
-  body        String   @db.Text
-  status      String
-  sentAt      DateTime @default(now())
+model VoiceTest {
+  id             String         @id @default(uuid())
+  phone          String
+  scenario       String         @db.Text
+  voiceType      String
+  transcript     String?        @db.Text
+  audioUrl       String?
+  createdAt      DateTime       @default(now())
 }
 
-model Email {
-  id          String   @id @default(uuid())
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  lead        Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  leadId      String?
-  subject     String
-  body        String   @db.Text
-  status      String
-  openRate    Float?   @default(0)
-  clickRate   Float?   @default(0)
-  sentAt      DateTime @default(now())
-}
-
-model Subscription {
-  id          String   @id @default(uuid())
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  plan        String   @default("STARTER")
-  status      String   @default("ACTIVE")
-  startedAt   DateTime @default(now())
-  renewsAt    DateTime
-}
-
-model Invoice {
-  id          String   @id @default(uuid())
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  amount      Float
-  dueDate     DateTime
-  paid        Boolean  @default(false)
-  invoiceUrl  String?
-  createdAt   DateTime @default(now())
-}
-
-model Payment {
-  id          String   @id @default(uuid())
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  amount      Float
-  method      String
-  status      String
-  paidAt      DateTime @default(now())
+model CallTranscript {
+  id             String         @id @default(uuid())
+  callId         String
+  role           String
+  message        String         @db.Text
+  createdAt      DateTime       @default(now())
 }
 
 model ChatbotLog {
-  id          String   @id @default(uuid())
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userId      String?
-  lead        Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  leadId      String?
-  sessionId   String
-  role        String
-  message     String   @db.Text
-  metadata    String?  @db.Text
-  createdAt   DateTime @default(now())
-}
-
-model VoiceLog {
-  id          String   @id @default(uuid())
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  clientId    String
-  callId      String?
-  transcript  String?  @db.Text
-  durationSec Int
-  createdAt   DateTime @default(now())
+  id             String         @id @default(uuid())
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId         String?
+  sessionId      String
+  role           String
+  message        String         @db.Text
+  metadata       String?        @db.Text
+  createdAt      DateTime       @default(now())
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userId      String?
-  action      String
-  actor       String?
-  target      String?
-  details     String?  @db.Text
-  ipAddress   String?
-  createdAt   DateTime @default(now())
+  id             String         @id @default(uuid())
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId         String?
+  action         String
+  actor          String?
+  target         String?
+  details        String?        @db.Text
+  ipAddress      String?
+  createdAt      DateTime       @default(now())
 }

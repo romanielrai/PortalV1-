@@ -16,6 +16,7 @@ const voiceRoutes = require('./routes/voice').default;
 const trialRoutes = require('./routes/trial').default;
 const superadminRoutes = require('./routes/superadmin').default;
 const adminRoutes = require('./routes/admin').default;
+const crmRoutes = require('./routes/crm').default;
 const app = express();
 
 app.use(helmet({
@@ -68,8 +69,18 @@ app.use('/api/voice', voiceRoutes);
 app.use('/api/voice', trialRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/crm', crmRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/health.png', (req, res) => {
+  const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+  res.writeHead(200, {
+    'Content-Type': 'image/png',
+    'Content-Length': pixel.length
+  });
+  res.end(pixel);
+});
 
 // Fallback 404 handler
 app.use((req, res) => {
@@ -83,7 +94,29 @@ app.use((error: Error, req: express.Request, res: express.Response, _next: expre
   res.status(500).json({ error: error.message || 'Internal server error' });
 });
 
-const port = Number(process.env.PORT ?? 4000);
-app.listen(port, () => {
-  console.log(`API server listening on http://localhost:${port}`);
-});
+import fs from 'fs';
+
+const startPort = Number(process.env.PORT ?? 4000);
+const startServer = (p: number) => {
+  const server = app.listen(p, () => {
+    console.log(`API server listening on http://localhost:${p}`);
+    try {
+      const portFilePath = path.resolve(__dirname, '../../backend_port.json');
+      fs.writeFileSync(portFilePath, JSON.stringify({ port: p }), 'utf8');
+      console.log(`Announced active backend port ${p} in backend_port.json`);
+    } catch (err) {
+      console.error('Failed to write backend_port.json:', err);
+    }
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`Port ${p} is occupied. Trying port ${p + 1}...`);
+      startServer(p + 1);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+};
+
+startServer(startPort);

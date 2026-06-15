@@ -295,7 +295,7 @@
         <div class="status-grid">
           <div class="status-box">
             <span class="label">Frontend</span>
-            <span class="port">Port 3001</span>
+            <span class="port" id="frontend-port-display">Port 3001</span>
             <div id="frontend-status" class="status-indicator offline">
               <span class="indicator-dot"></span>
               <span class="text">Offline</span>
@@ -303,7 +303,7 @@
           </div>
           <div class="status-box">
             <span class="label">API Backend</span>
-            <span class="port">Port 4000</span>
+            <span class="port" id="backend-port-display">Port 4000</span>
             <div id="backend-status" class="status-indicator offline">
               <span class="indicator-dot"></span>
               <span class="text">Offline</span>
@@ -328,66 +328,112 @@
         </div>
 
         <!-- Direct Link Button (Hidden by default, shown if online) -->
-        <a href="http://localhost:3001/" class="btn" id="launch-btn" style="display: none;">
+        <a href="#" class="btn" id="launch-btn" style="display: none;">
           Launch Live App
         </a>
       </div>
     </div>
 
     <script>
-      const FRONTEND_URLS = ['http://127.0.0.1:3001', 'http://localhost:3001'];
-      const BACKEND_URLS = ['http://127.0.0.1:4000/api/health', 'http://localhost:4000/api/health'];
-      
-      let isFrontendOnline = false;
-      let isBackendOnline = false;
+      // Support scanning multiple ports in case of local conflicts
+      const FRONTEND_PORTS = [3001, 3000, 3002, 3003, 3004, 3005];
+      const BACKEND_PORTS = [4000, 4001, 4002, 4003, 4004, 4005];
+
+      let detectedFrontendPort = null;
+      let detectedBackendPort = null;
       let redirectTriggered = false;
 
-      async function checkPort(urls) {
-        for (const url of urls) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 800);
-            await fetch(url, { 
-              mode: 'no-cors', 
-              signal: controller.signal 
-            });
-            clearTimeout(timeoutId);
-            return true;
-          } catch (e) {
-            // Keep trying next URL
-          }
-        }
-        return false;
+      // Check query params first for override
+      const urlParams = new URLSearchParams(window.location.search);
+      const feOverride = urlParams.get('fe');
+      const beOverride = urlParams.get('be');
+
+      function probePortWithImage(url) {
+        return new Promise((resolve) => {
+          const img = new Image();
+          const timer = setTimeout(() => {
+            img.src = "";
+            resolve(false);
+          }, 800);
+
+          img.onload = () => {
+            clearTimeout(timer);
+            resolve(true);
+          };
+          img.onerror = () => {
+            clearTimeout(timer);
+            resolve(false);
+          };
+          img.src = `${url}?t=${Date.now()}`;
+        });
+      }
+
+      async function probeFrontend(port) {
+        return probePortWithImage(`http://localhost:${port}/favicon.ico`);
+      }
+
+      async function probeBackend(port) {
+        return probePortWithImage(`http://localhost:${port}/health.png`);
       }
 
       async function updateStatuses() {
-        // Run checks concurrently
-        const [feCheck, beCheck] = await Promise.all([
-          checkPort(FRONTEND_URLS),
-          checkPort(BACKEND_URLS)
-        ]);
+        // 1. Scan Frontend Ports
+        let fePort = null;
+        if (feOverride) {
+          if (await probeFrontend(parseInt(feOverride))) {
+            fePort = parseInt(feOverride);
+          }
+        } else {
+          for (const port of FRONTEND_PORTS) {
+            if (await probeFrontend(port)) {
+              fePort = port;
+              break;
+            }
+          }
+        }
 
-        isFrontendOnline = feCheck;
-        isBackendOnline = beCheck;
+        // 2. Scan Backend Ports
+        let bePort = null;
+        if (beOverride) {
+          if (await probeBackend(parseInt(beOverride))) {
+            bePort = parseInt(beOverride);
+          }
+        } else {
+          for (const port of BACKEND_PORTS) {
+            if (await probeBackend(port)) {
+              bePort = port;
+              break;
+            }
+          }
+        }
 
-        // Update Frontend UI
+        detectedFrontendPort = fePort;
+        detectedBackendPort = bePort;
+
+        // Update Frontend UI Status
         const feIndicator = document.getElementById('frontend-status');
-        if (isFrontendOnline) {
+        const fePortDisplay = document.getElementById('frontend-port-display');
+        if (detectedFrontendPort) {
           feIndicator.className = 'status-indicator online';
           feIndicator.querySelector('.text').textContent = 'Online';
+          fePortDisplay.textContent = `Port ${detectedFrontendPort}`;
         } else {
           feIndicator.className = 'status-indicator offline';
           feIndicator.querySelector('.text').textContent = 'Offline';
+          fePortDisplay.textContent = 'Port 3001';
         }
 
-        // Update Backend UI
+        // Update Backend UI Status
         const beIndicator = document.getElementById('backend-status');
-        if (isBackendOnline) {
+        const bePortDisplay = document.getElementById('backend-port-display');
+        if (detectedBackendPort) {
           beIndicator.className = 'status-indicator online';
           beIndicator.querySelector('.text').textContent = 'Online';
+          bePortDisplay.textContent = `Port ${detectedBackendPort}`;
         } else {
           beIndicator.className = 'status-indicator offline';
           beIndicator.querySelector('.text').textContent = 'Offline';
+          bePortDisplay.textContent = 'Port 4000';
         }
 
         const title = document.getElementById('title');
@@ -396,22 +442,21 @@
         const loader = document.getElementById('loader');
         const launchBtn = document.getElementById('launch-btn');
 
-        if (isFrontendOnline && isBackendOnline) {
-          // Everything is running
+        if (detectedFrontendPort && detectedBackendPort) {
           title.textContent = 'Servers Connected';
           statusText.textContent = 'Redirecting to your application cockpit...';
           instructions.style.display = 'none';
           loader.style.display = 'none';
           launchBtn.style.display = 'inline-flex';
+          launchBtn.href = `http://localhost:${detectedFrontendPort}/`;
           
           if (!redirectTriggered) {
             redirectTriggered = true;
             setTimeout(() => {
-              window.location.href = FRONTEND_URLS[0]; // Redirect to IP for stability
+              window.location.href = `http://localhost:${detectedFrontendPort}/`;
             }, 800);
           }
         } else {
-          // Offline or partially online
           title.textContent = 'Launcher Offline';
           statusText.textContent = 'Please start the local development server to continue.';
           instructions.style.display = 'block';

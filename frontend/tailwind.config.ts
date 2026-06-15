@@ -18,7 +18,8 @@ const config: Config = {
         glow: '0 25px 80px rgba(143,122,103,0.2)',
       },
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['var(--font-plus-jakarta)', 'sans-serif'],
       },
     },
   },

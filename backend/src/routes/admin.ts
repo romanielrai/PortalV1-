@@ -186,7 +186,7 @@ router.get('/calls', async (req, res) => {
       }
     ];
 
-    const results = calls.map((c, index) => {
+    const results = calls.map((c: any, index: number) => {
       const scoreGreeting = c.outcome === 'initiated' ? 0 : 85 + (index * 7) % 15;
       const scoreCompliance = c.outcome === 'initiated' ? 0 : 80 + (index * 3) % 20;
       const sentiment = c.outcome === 'initiated' ? 'Neutral' : (scoreGreeting > 90 ? 'Positive' : 'Neutral');
