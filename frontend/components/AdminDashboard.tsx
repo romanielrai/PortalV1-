@@ -3,10 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Users, Calendar, PhoneCall, Settings, Database,
-  TrendingUp, RefreshCw, Plus, Edit2, Trash2, Check, X,
-  Save, Volume2, ShieldCheck, AlertCircle, Play, Download,
-  ChevronRight, BarChart2
+  Users, Calendar, PhoneCall, Settings, Database, AlertCircle,
+  RefreshCw, Plus, Edit2, Trash2, Check, X,
+  Save, Play, ShieldCheck, BarChart2
 } from 'lucide-react';
 
 interface Client {
@@ -212,7 +211,7 @@ export default function AdminDashboard() {
     return () => {
       sse.close();
     };
-  }, []);
+  }, [fetchData]);
 
   // --- Client CRUD Actions ---
   const openAddClientModal = () => {

@@ -192,6 +192,7 @@ function getRelationValue(modelName: string, item: any, relationKey: string): an
     if (rel === 'role') return store.role.find(r => r.id === item.roleId);
     if (rel === 'client') return store.client.find(c => c.id === item.clientId);
     if (rel === 'agent') return store.agent.find(a => a.id === item.agentId);
+    if (rel === 'designation') return store.designation.find(d => d.id === item.designationId);
   }
   if (model === 'project') {
     if (rel === 'client') return store.client.find(c => c.id === item.clientId);
@@ -266,6 +267,11 @@ function resolveIncludes(modelName: string, item: any, include: any): any {
     if (relation === 'agent' && modelName === 'user') {
       const agent = store.agent.find(a => a.id === item.agentId);
       resolved.agent = agent ?? null;
+    }
+
+    if (relation === 'designation' && modelName === 'user') {
+      const des = store.designation.find(d => d.id === item.designationId);
+      resolved.designation = des ?? null;
     }
 
     if (relation === 'client' && modelName === 'project') {

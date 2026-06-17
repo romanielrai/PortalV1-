@@ -2,16 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { 
-  Play, Pause, Smartphone, MessageSquare, Send, Users, PhoneCall, 
-  TrendingUp, Sparkles, RefreshCw, CheckCircle, Volume2, ChevronRight, Clock
-} from 'lucide-react';
+import { Smartphone, MessageSquare, Send, Users, PhoneCall, Sparkles, RefreshCw, TrendingUp, Volume2, CheckCircle, ChevronRight } from 'lucide-react';
 
-const demoHighlights = [
-  { title: 'AI CSR Answering Service', desc: 'See the voice receptionist answer inbound dials, handle service routing, check availability, and book CRM tickets.' },
-  { title: 'Missed Call SMS Recovery', desc: 'Experience the auto-text-back sequence initiated within seconds of an unanswered call to secure booking intent.' },
-  { title: 'Dead Lead Reactivation', desc: 'Watch the autodialer and text templates turn dormant database customer sheets into active booking outcomes.' }
-];
+
 
 export default function WatchDemoPage() {
   const [activeTab, setActiveTab] = useState<'voice' | 'sms' | 'reactivation' | 'analytics'>('voice');

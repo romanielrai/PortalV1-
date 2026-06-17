@@ -4,18 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, 
-  Phone, 
-  Mail, 
-  Lock, 
-  Check, 
-  ArrowRight, 
-  ArrowLeft, 
-  Sparkles, 
-  AlertCircle,
-  Bot
-} from 'lucide-react';
+import { User, Phone, Mail, Lock, Sparkles, AlertCircle } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();

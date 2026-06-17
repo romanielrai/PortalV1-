@@ -462,10 +462,19 @@ router.patch('/projects/:id/agent-work', requireAuth, async (req: AuthRequest, r
 router.get('/agent-leads/:projectId', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { projectId } = req.params;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: req.user!.id }
+    });
+
+    const isAgent = req.user!.role === 'AGENT' || req.user!.role === 'EMPLOYEE' || req.user!.role === 'TEAMLEADER';
+
+    const filter: any = { projectId };
+    if (isAgent) {
+      filter.userId = { in: [req.user!.id, dbUser?.agentId || ''] };
+    }
+
     const leads = await prisma.lead.findMany({
-      where: {
-        projectId
-      }
+      where: filter
     });
     res.json({ leads });
   } catch (error: any) {
@@ -473,23 +482,58 @@ router.get('/agent-leads/:projectId', requireAuth, async (req: AuthRequest, res)
   }
 });
 
-// Update Lead Status (NEW, CONTACTED, NO_ANSWER, INTERESTED, FOLLOW_UP, CLOSED)
+// Update Lead Status & Details (including decision maker email/phone and calls tracking)
 router.patch('/leads/:id/status', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, phone, email, notes } = req.body;
 
     const lead = await prisma.lead.findUnique({ where: { id }, include: { project: true } });
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
+    const updateData: any = {};
+    if (status !== undefined) updateData.status = status;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (notes !== undefined) updateData.notes = notes;
+
     const updated = await prisma.lead.update({
       where: { id },
-      data: { status }
+      data: updateData
     });
 
-    // Re-evaluate project progress based on completed leads (e.g. CLOSED)
+    // Automatically increment callsMade for today's daily planner if status changed and it is modified by agent
+    if (status && status !== 'NEW') {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const planner = await prisma.dailyPlanner.findFirst({
+        where: { userId: req.user!.id, date: todayStr }
+      });
+
+      if (planner) {
+        await prisma.dailyPlanner.update({
+          where: { id: planner.id },
+          data: { callsMade: (planner.callsMade || 0) + 1 }
+        });
+      } else {
+        await prisma.dailyPlanner.create({
+          data: {
+            userId: req.user!.id,
+            date: todayStr,
+            callTarget: 20, // default target
+            callsMade: 1
+          }
+        });
+      }
+    }
+
+    // Re-evaluate project progress based on completed leads
     const totalLeads = await prisma.lead.count({ where: { projectId: lead.projectId } });
-    const completedLeads = await prisma.lead.count({ where: { projectId: lead.projectId, status: 'CLOSED' } });
+    const completedLeads = await prisma.lead.count({ 
+      where: { 
+        projectId: lead.projectId, 
+        status: { in: ['CLOSED', 'DEAL_CLOSED', 'Deal Closed ✅', 'Call Went Well', 'Follow-up Meeting Scheduled'] } 
+      } 
+    });
     const progressPercent = totalLeads > 0 ? Math.min(Math.round((completedLeads / totalLeads) * 100), 100) : 0;
 
     await prisma.project.update({
@@ -503,6 +547,228 @@ router.patch('/leads/:id/status', requireAuth, async (req: AuthRequest, res) => 
     res.json({ lead: updated });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// --- AGENT WORKSPACE PLANNER & DAILY UPDATES ---
+
+// Get agent's planner details for today
+router.get('/agent/daily-planner', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Find or create planner for today
+    let planner = await prisma.dailyPlanner.findFirst({
+      where: { userId: req.user!.id, date: todayStr }
+    });
+
+    if (!planner) {
+      planner = await prisma.dailyPlanner.create({
+        data: {
+          userId: req.user!.id,
+          date: todayStr,
+          callTarget: 20,
+          callsMade: 0
+        }
+      });
+    }
+
+    // Fetch meetings
+    const meetings = await prisma.employeeMeeting.findMany({
+      where: { userId: req.user!.id, date: todayStr }
+    });
+
+    // Fetch tasks
+    const tasks = await prisma.employeeTask.findMany({
+      where: { userId: req.user!.id, date: todayStr }
+    });
+
+    return res.json({ planner, meetings, tasks });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Set daily call target
+router.post('/agent/daily-planner/target', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { target } = req.body;
+    if (target === undefined) return res.status(400).json({ error: 'Target value is required' });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let planner = await prisma.dailyPlanner.findFirst({
+      where: { userId: req.user!.id, date: todayStr }
+    });
+
+    if (planner) {
+      planner = await prisma.dailyPlanner.update({
+        where: { id: planner.id },
+        data: { callTarget: Number(target) }
+      });
+    } else {
+      planner = await prisma.dailyPlanner.create({
+        data: {
+          userId: req.user!.id,
+          date: todayStr,
+          callTarget: Number(target),
+          callsMade: 0
+        }
+      });
+    }
+
+    return res.json({ planner });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Schedule a meeting
+router.post('/agent/daily-planner/meeting', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { time, prospectName, purpose } = req.body;
+    if (!time || !prospectName) return res.status(400).json({ error: 'Time and prospectName are required' });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const meeting = await prisma.employeeMeeting.create({
+      data: {
+        userId: req.user!.id,
+        date: todayStr,
+        time,
+        prospectName,
+        purpose: purpose || '',
+        completed: false
+      }
+    });
+
+    return res.json({ meeting });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Update meeting state
+router.patch('/agent/daily-planner/meeting/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { completed, time, prospectName, purpose } = req.body;
+
+    const data: any = {};
+    if (completed !== undefined) data.completed = completed;
+    if (time !== undefined) data.time = time;
+    if (prospectName !== undefined) data.prospectName = prospectName;
+    if (purpose !== undefined) data.purpose = purpose;
+
+    const meeting = await prisma.employeeMeeting.update({
+      where: { id },
+      data
+    });
+
+    return res.json({ meeting });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete a meeting
+router.delete('/agent/daily-planner/meeting/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.employeeMeeting.delete({ where: { id } });
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Add personal task
+router.post('/agent/daily-planner/task', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { title } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const task = await prisma.employeeTask.create({
+      data: {
+        userId: req.user!.id,
+        date: todayStr,
+        title,
+        completed: false
+      }
+    });
+
+    return res.json({ task });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Update task state
+router.patch('/agent/daily-planner/task/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { completed, title } = req.body;
+
+    const data: any = {};
+    if (completed !== undefined) data.completed = completed;
+    if (title !== undefined) data.title = title;
+
+    const task = await prisma.employeeTask.update({
+      where: { id },
+      data
+    });
+
+    return res.json({ task });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete task
+router.delete('/agent/daily-planner/task/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.employeeTask.delete({ where: { id } });
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Log daily updates
+router.post('/agent/daily-update', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { summary } = req.body;
+    if (!summary) return res.status(400).json({ error: 'Summary is required' });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dailyUpdate = await prisma.dailyUpdate.create({
+      data: {
+        userId: req.user!.id,
+        date: todayStr,
+        summary
+      }
+    });
+
+    // Log Activity
+    await pushActivity(req.user!.id, 'Daily update logged', `Logged work update: "${summary.substring(0, 60)}..."`);
+
+    return res.json({ dailyUpdate });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Get recent daily updates of logged in agent
+router.get('/agent/daily-updates', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const updates = await prisma.dailyUpdate.findMany({
+      where: { userId: req.user!.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+    return res.json({ updates });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
   }
 });
 

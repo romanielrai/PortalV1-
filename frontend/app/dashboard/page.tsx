@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import SuperAdminDashboard from '../../components/SuperAdminDashboard';
 import AdminDashboard from '../../components/AdminDashboard';
 import ClientDashboard from '../../components/ClientDashboard';
@@ -19,11 +19,7 @@ export default function UnifiedDashboardPage() {
     window.location.reload();
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
-  };
+
 
   useEffect(() => {
     const token = localStorage.getItem('token');

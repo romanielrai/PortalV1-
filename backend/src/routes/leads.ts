@@ -54,7 +54,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     if (source && (source.startsWith('Demo Booking –') || source.startsWith('Demo Booking -') || source.startsWith('Demo Booking'))) {
       try {
-        const slotText = source.replace(/Demo Booking\s*[\-\–]\s*/i, '').trim();
+        const slotText = source.replace(/Demo Booking\s*[-–]\s*/i, '').trim();
         const scheduledAt = parseSlotToDate(slotText);
         await prisma.appointment.create({
           data: {
