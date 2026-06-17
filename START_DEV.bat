@@ -1,80 +1,93 @@
 @echo off
 setlocal enabledelayedexpansion
+title Bhumi Didi Web - Dev Server Manager
 
 echo.
-echo ====================================================
-echo   Bhumi Didi Web - Startup Manager
-echo ====================================================
+echo ===================================================
+echo   Bhumi Didi Web - One-Click Dev Launcher
+echo ===================================================
 echo.
 
-:: 1. Check Node.js installation
+:: ─── 1. Check Node.js ───────────────────────────────
 node -v >nul 2>&1
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Node.js is not installed!
-    echo Please install Node.js from https://nodejs.org/ to run the app.
+    echo Please download and install Node.js from: https://nodejs.org/
     pause
     exit /b 1
 )
-echo [OK] Node.js is installed.
+for /f "tokens=*" %%v in ('node -v') do set NODE_VER=%%v
+echo [OK] Node.js %NODE_VER% detected.
 
-:: 2. Cleanup processes running on ports 3001 and 4000
-echo [1/5] Freeing ports 3001 and 4000...
-for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr :3001') do (
+:: ─── 2. Fix PowerShell Execution Policy ─────────────
+echo [1/5] Fixing PowerShell execution policy...
+powershell -Command "Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force" >nul 2>&1
+echo [OK] PowerShell execution policy set to RemoteSigned.
+
+:: ─── 3. Free Ports 3001 and 4000 ────────────────────
+echo [2/5] Freeing ports 3001 and 4000...
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":3001 " ^| findstr "LISTENING"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
-for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr :4000') do (
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":4000 " ^| findstr "LISTENING"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
 echo [OK] Ports cleared.
 
-:: 3. Configure npm script shell to avoid Execution Policy blocks
-call npm config set script-shell cmd >nul 2>&1
-
-:: 4. Check and install dependencies
-echo [2/5] Checking dependencies (this may take a few seconds)...
-if not exist "node_modules" (
-    echo Root dependencies missing. Installing...
+:: ─── 4. Install missing dependencies ────────────────
+echo [3/5] Checking dependencies...
+if not exist "node_modules\concurrently" (
+    echo Installing root dependencies...
     call npm install --legacy-peer-deps
 )
-if not exist "frontend\node_modules" (
-    echo Frontend dependencies missing. Installing...
+if not exist "frontend\node_modules\next" (
+    echo Installing frontend dependencies...
     call npm --workspace frontend install --legacy-peer-deps
 )
-if not exist "backend\node_modules" (
-    echo Backend dependencies missing. Installing...
+if not exist "backend\node_modules\express" (
+    echo Installing backend dependencies...
     call npm --workspace backend install --legacy-peer-deps
 )
-echo [OK] Dependencies ready.
-
-:: 5. Start Backend Server with Auto-Retry loop
-echo [3/5] Launching Backend Server on port 4000...
-start "Backend Server (Port 4000)" cmd /k "cd backend && echo Starting backend server... && :loop && call npm run dev || (echo [CRASH] Backend exited unexpectedly. Restarting in 3 seconds... && timeout /t 3 && goto loop)"
-
-:: 6. Wait for Backend Health Check (GET /health) to be online
-echo [4/5] Waiting for Backend to be online...
-:wait_backend
-powershell -Command "(Invoke-WebRequest -Uri http://127.0.0.1:4000/health -UseBasicParsing).Content" >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    timeout /t 1 /nobreak >nul
-    goto wait_backend
+if not exist "node_modules\ts-node-dev" (
+    echo Installing ts-node-dev globally in root...
+    call npm install ts-node-dev --save-dev --legacy-peer-deps
 )
-echo [OK] Backend is online!
+echo [OK] All dependencies ready.
 
-:: 7. Start Frontend Server on port 3001
-echo [5/5] Launching Frontend Server on port 3001...
-start "Frontend Server (Port 3001)" cmd /k "cd frontend && echo Starting frontend server... && call npm run dev"
+:: ─── 5. Launch Backend Server (Port 4000) ───────────
+echo [4/5] Launching Backend API Server on port 4000...
+start "Backend API - Port 4000" cmd /k "title Backend API Port 4000 && color 0A && echo. && echo  [BACKEND] Starting API server on port 4000... && echo. && npm run dev:server && echo. && echo [STOPPED] Backend server stopped. Press any key. && pause"
 
-:: 8. Open Launcher / Web Application
+:: ─── 6. Wait for backend to be ready ────────────────
+echo Waiting for backend to start...
+:waitloop
+timeout /t 2 /nobreak >nul
+powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://127.0.0.1:4000/health' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>&1
+if %ERRORLEVEL% neq 0 goto waitloop
+echo [OK] Backend is online at http://localhost:4000
+
+:: ─── 7. Launch Frontend (Port 3001) ─────────────────
+echo [5/5] Launching Frontend on port 3001...
+start "Frontend App - Port 3001" cmd /k "title Frontend App Port 3001 && color 09 && echo. && echo  [FRONTEND] Starting Next.js app on port 3001... && echo. && npm run dev:app && echo. && echo [STOPPED] Frontend server stopped. Press any key. && pause"
+
+:: ─── 8. Wait briefly then open browser ──────────────
 echo.
-echo ====================================================
-echo   SUCCESS: Launching your Browser Cockpit
-echo ====================================================
+echo Waiting for frontend to compile (this takes ~20 seconds first time)...
+timeout /t 8 /nobreak >nul
+
 echo.
+echo ===================================================
+echo   SUCCESS! Both servers are running.
+echo   Frontend:  http://localhost:3001
+echo   Backend:   http://localhost:4000
+echo   Health:    http://localhost:4000/health
+echo ===================================================
+echo.
+echo Opening application in your browser...
+start "" "http://localhost:3001"
 
-:: Open index.html launcher
-start "" "%~dp0index.html"
-
-echo Both servers are running.
-echo To view diagnostics, run: npm run doctor
+echo.
+echo Both server windows are open in separate terminals.
+echo Close those windows to stop the servers.
 echo.
 pause

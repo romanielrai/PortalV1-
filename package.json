@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "clean-ports": "npx -y kill-port 3001 4000 || true",
-    "dev": "npm run clean-ports && concurrently \"npm --workspace frontend run dev\" \"npm --workspace backend run dev\"",
+    "dev": "concurrently \"npm --workspace backend run dev\" \"npm --workspace frontend run dev\"",
     "doctor": "node doctor.js",
     "dev:app": "npm --workspace frontend run dev",
     "dev:server": "npm --workspace backend run dev",
@@ -19,5 +19,9 @@
   "devDependencies": {
     "concurrently": "^8.2.0",
     "kill-port": "^1.6.1"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   }
 }
