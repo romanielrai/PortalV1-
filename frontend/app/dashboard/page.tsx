@@ -51,9 +51,13 @@ export default function UnifiedDashboardPage() {
       case 'SUPERADMIN':
         return 'Super Admin';
       case 'ADMIN':
-        return 'Admin';
+        return 'Company Admin';
+      case 'TEAMLEADER':
+        return 'Team Leader';
       case 'AGENT':
         return 'Outbound Agent';
+      case 'EMPLOYEE':
+        return 'Employee';
       case 'CLIENT':
         return 'Client Portal';
       case 'USER':
@@ -62,6 +66,9 @@ export default function UnifiedDashboardPage() {
         return role ? role.charAt(0).toUpperCase() + role.slice(1).toLowerCase() : 'User';
     }
   };
+
+  const isStaffRole = (role: string) => ['AGENT', 'TEAMLEADER', 'EMPLOYEE', 'ADMIN'].includes(role?.toUpperCase());
+  const isAdminRole = (role: string) => role?.toUpperCase() === 'SUPERADMIN';
 
   if (loading) {
     return (
@@ -78,7 +85,7 @@ export default function UnifiedDashboardPage() {
       {/* Dynamic Background Glow */}
       <div className="absolute inset-0 -z-10 flex items-center justify-center overflow-hidden pointer-events-none">
         <div className={`h-[350px] w-[600px] rounded-full blur-[140px] opacity-15 transition-colors duration-500 ${
-          userRole === 'SUPERADMIN' || userRole === 'ADMIN' ? 'bg-purple-600' : userRole === 'AGENT' ? 'bg-amber-600' : 'bg-blue-600'
+          isAdminRole(userRole) ? 'bg-purple-600' : isStaffRole(userRole) ? 'bg-amber-600' : 'bg-blue-600'
         }`} />
       </div>
 
@@ -89,10 +96,10 @@ export default function UnifiedDashboardPage() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full animate-ping ${
-                userRole === 'SUPERADMIN' || userRole === 'ADMIN' ? 'bg-purple-500' : userRole === 'AGENT' ? 'bg-amber-500' : 'bg-emerald-500'
+                isAdminRole(userRole) ? 'bg-purple-500' : isStaffRole(userRole) ? 'bg-amber-500' : 'bg-emerald-500'
               }`} />
               <p className="text-xs uppercase tracking-[0.25em] font-bold text-white/70">
-                {userRole === 'SUPERADMIN' || userRole === 'ADMIN' ? 'Enterprise System Cockpit' : userRole === 'AGENT' ? 'Agent Dialer Workspace' : 'Client Workspace Command Center'}
+                {isAdminRole(userRole) ? 'Enterprise System Cockpit' : isStaffRole(userRole) ? 'Staff Workspace' : 'Client Workspace Command Center'}
               </p>
             </div>
             
@@ -103,8 +110,8 @@ export default function UnifiedDashboardPage() {
             {/* Badges bar */}
             <div className="flex flex-wrap items-center gap-2.5 pt-1">
               <span className={`rounded-full border px-3 py-1 text-2xs font-bold ${
-                userRole === 'SUPERADMIN' || userRole === 'ADMIN' ? 'bg-purple-950/40 border-purple-500/35 text-purple-300' :
-                userRole === 'AGENT' ? 'bg-amber-950/40 border-amber-500/30 text-amber-300' :
+                isAdminRole(userRole) ? 'bg-purple-950/40 border-purple-500/35 text-purple-300' :
+                isStaffRole(userRole) ? 'bg-amber-950/40 border-amber-500/30 text-amber-300' :
                 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
               }`}>
                 {getRoleLabel(userRole)}
@@ -129,9 +136,8 @@ export default function UnifiedDashboardPage() {
         {/* Dashboard Conditional Mounting */}
         <div className="transition-opacity duration-300">
           {userRole === 'SUPERADMIN' && <SuperAdminDashboard />}
-          {userRole === 'ADMIN' && <AdminDashboard />}
-          {userRole === 'AGENT' && <AgentDashboard />}
-          {userRole !== 'SUPERADMIN' && userRole !== 'ADMIN' && userRole !== 'AGENT' && <ClientDashboard />}
+          {isStaffRole(userRole) && <AgentDashboard />}
+          {!isAdminRole(userRole) && !isStaffRole(userRole) && <ClientDashboard />}
         </div>
       </div>
     </main>

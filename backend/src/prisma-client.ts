@@ -6,9 +6,11 @@ import path from 'path';
 const store: Record<string, any[]> = {
   role: [
     { id: 'role-superadmin', name: 'SUPERADMIN', description: 'Platform Owner / Super Administrator' },
-    { id: 'role-admin', name: 'ADMIN', description: 'System Administrator' },
+    { id: 'role-admin', name: 'ADMIN', description: 'Company Admin / Manager' },
     { id: 'role-client', name: 'CLIENT', description: 'CRM Platform Client' },
-    { id: 'role-agent', name: 'AGENT', description: 'Outbound Dialing Agent' }
+    { id: 'role-agent', name: 'AGENT', description: 'Outbound Dialing Agent' },
+    { id: 'role-teamleader', name: 'TEAMLEADER', description: 'Team Leader / Supervisor' },
+    { id: 'role-employee', name: 'EMPLOYEE', description: 'Regular Employee' }
   ],
   user: [
     {
