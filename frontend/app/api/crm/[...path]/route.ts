@@ -530,14 +530,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pa
     if (action === 'START') {
       status = 'WORK_STARTED';
       progress = 25;
-      startDate = new Date().toISOString();
+      startDate = new Date() as any;
     } else if (action === 'PAUSE') {
       status = 'IN_PROGRESS';
       progress = 50;
     } else if (action === 'COMPLETE') {
       status = 'COMPLETED';
       progress = 100;
-      actualCompletion = new Date().toISOString();
+      actualCompletion = new Date() as any;
     }
 
     const updated = await prisma.project.update({
