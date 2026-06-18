@@ -99,6 +99,8 @@ const store: Record<string, any[]> = {
   designation: [],
   call: [],
   appointment: [],
+  employeemeeting: [],
+  employeetask: [],
 };
 
 // ─── Helper: filter items ────────────────────────────────────────────────────
@@ -271,6 +273,8 @@ class PrismaClient {
   appointment = createModel('appointment');
   dailyPlanner = createModel('dailyplanner');
   dailyUpdate = createModel('dailyupdate');
+  employeeMeeting = createModel('employeemeeting');
+  employeeTask = createModel('employeetask');
 
   async $connect() {}
   async $disconnect() {}

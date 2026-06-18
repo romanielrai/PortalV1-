@@ -2,13 +2,14 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { requireAuth, json } from '@/lib/auth';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = requireAuth(req);
   if ('error' in auth) return auth.error;
   const { user } = auth;
 
   try {
-    const { id } = params;
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
     const { status, name, email, phone, business } = await req.json();
 
     const lead = await prisma.lead.findUnique({ where: { id } });
@@ -38,13 +39,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = requireAuth(req);
   if ('error' in auth) return auth.error;
   const { user } = auth;
 
   try {
-    const { id } = params;
+    const resolvedParams = await params;
+    const { id } = resolvedParams;
     const lead = await prisma.lead.findUnique({ where: { id } });
     if (!lead) return json({ error: 'Lead not found' }, 404);
 

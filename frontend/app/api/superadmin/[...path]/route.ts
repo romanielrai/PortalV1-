@@ -12,12 +12,13 @@ async function checkSuperAdmin(req: NextRequest) {
   return { user: auth.user };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkSuperAdmin(req);
   if ('error' in check) return check.error;
   const { user } = check;
 
-  const path = params.path.join('/');
+  const resolvedParams = await params;
+  const path = resolvedParams.path.join('/');
 
   // --- users ---
   if (path === 'users') {
@@ -164,12 +165,13 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
   return json({ error: 'Not found' }, 404);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkSuperAdmin(req);
   if ('error' in check) return check.error;
   const { user } = check;
 
-  const path = params.path.join('/');
+  const resolvedParams = await params;
+  const path = resolvedParams.path.join('/');
   const body = await req.json().catch(() => ({}));
 
   // --- users ---
@@ -379,12 +381,13 @@ export async function POST(req: NextRequest, { params }: { params: { path: strin
   return json({ error: 'Not found' }, 404);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkSuperAdmin(req);
   if ('error' in check) return check.error;
   const { user } = check;
 
-  const pathParts = params.path;
+  const resolvedParams = await params;
+  const pathParts = resolvedParams.path;
   const body = await req.json().catch(() => ({}));
 
   // PATCH /superadmin/users/:id
@@ -466,12 +469,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { path: stri
   return json({ error: 'Not found' }, 404);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkSuperAdmin(req);
   if ('error' in check) return check.error;
   const { user } = check;
 
-  const pathParts = params.path;
+  const resolvedParams = await params;
+  const pathParts = resolvedParams.path;
 
   // DELETE /superadmin/users/:id
   if (pathParts[0] === 'users' && pathParts[1]) {

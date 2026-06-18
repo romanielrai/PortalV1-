@@ -11,11 +11,12 @@ async function checkAdmin(req: NextRequest) {
   return { user: auth.user };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkAdmin(req);
   if ('error' in check) return check.error;
 
-  const path = params.path.join('/');
+  const resolvedParams = await params;
+  const path = resolvedParams.path.join('/');
 
   if (path === 'clients') {
     const clients = await prisma.client.findMany();
@@ -86,12 +87,13 @@ export async function GET(req: NextRequest, { params }: { params: { path: string
   return json({ error: 'Not found' }, 404);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkAdmin(req);
   if ('error' in check) return check.error;
   const { user } = check;
 
-  const path = params.path.join('/');
+  const resolvedParams = await params;
+  const path = resolvedParams.path.join('/');
   const body = await req.json().catch(() => ({}));
 
   if (path === 'clients') {
@@ -120,12 +122,13 @@ export async function POST(req: NextRequest, { params }: { params: { path: strin
   return json({ error: 'Not found' }, 404);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkAdmin(req);
   if ('error' in check) return check.error;
   const { user } = check;
 
-  const pathParts = params.path;
+  const resolvedParams = await params;
+  const pathParts = resolvedParams.path;
   const body = await req.json().catch(() => ({}));
 
   if (pathParts[0] === 'clients' && pathParts[1]) {
@@ -157,12 +160,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { path: stri
   return json({ error: 'Not found' }, 404);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const check = await checkAdmin(req);
   if ('error' in check) return check.error;
   const { user } = check;
 
-  const pathParts = params.path;
+  const resolvedParams = await params;
+  const pathParts = resolvedParams.path;
 
   if (pathParts[0] === 'clients' && pathParts[1]) {
     const id = pathParts[1];
