@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
         role: user.role?.name,
         phone: user.phone || user.client?.contactPhone || '',
         business: user.client?.companyName || '',
-        agentId: user.agentId || '',
+        adminId: (user as any).adminId || '',
         clientId: user.clientId || '',
       },
     });

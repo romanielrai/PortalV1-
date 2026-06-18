@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
         queueSize: 0,
       },
       integrations: {
-        databaseType: 'In-Memory (Serverless)',
+        databaseType: 'Supabase PostgreSQL',
         databaseConnection: 'CONNECTED',
         openai: process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('mock') ? 'LIVE' : 'SIMULATED',
         twilio: process.env.TWILIO_ACCOUNT_SID?.startsWith('AC') ? 'LIVE' : 'SIMULATED',
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   // --- prospects/summary ---
   if (path === 'prospects/summary') {
     const projects = await prisma.project.findMany({
-      include: { agent: true, leads: true },
+      include: { admin: true, leads: true },
       orderBy: { createdAt: 'desc' },
     });
     const summary = await Promise.all(
@@ -122,12 +122,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
         const total = p.leads?.length ?? 0;
         const assigned = (p.leads ?? []).filter((l: any) => l.userId).length;
         const completed = (p.leads ?? []).filter((l: any) => l.status === 'CLOSED').length;
-        const agentUser = p.agentId
-          ? await prisma.user.findFirst({ where: { agentId: p.agentId } })
+        const adminUser = p.adminId
+          ? await prisma.user.findFirst({ where: { adminId: p.adminId } })
           : null;
         const firstLead = p.leads?.[0];
         const assignedUser =
-          agentUser ||
+          adminUser ||
           (firstLead?.userId ? await prisma.user.findUnique({ where: { id: firstLead.userId } }) : null);
         return {
           id: p.id,
@@ -219,12 +219,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
     if (!role) return json({ error: `Invalid role name: ${roleName}` }, 400);
 
     const passwordHash = await bcrypt.hash(password, 12);
-    let agentId = undefined;
-    if (roleName === 'AGENT') {
-      const agent = await prisma.agent.create({
+    let adminId = undefined;
+    if (roleName === 'ADMIN') {
+      const adminRec = await prisma.admin.create({
         data: { name: name || email.split('@')[0], email, phone: phone || '', capacity: 1000, status: 'AVAILABLE' },
       });
-      agentId = agent.id;
+      adminId = adminRec.id;
     }
 
     const employee = await prisma.user.create({
@@ -234,11 +234,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
         passwordHash,
         roleId: role.id,
         phone: phone || '',
-        designationId: designationId || '',
-        agentId,
+        designationId: designationId || null,
+        adminId,
         status: 'ACTIVE',
         suspended: false,
-        joiningDate: new Date().toISOString(),
       },
       include: { role: true },
     });
@@ -252,11 +251,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
 
   // --- designations ---
   if (path === 'designations') {
-    const { name, description, permissions } = body;
+    const { name } = body;
     if (!name) return json({ error: 'Name is required' }, 400);
 
     const designation = await prisma.designation.create({
-      data: { name, description: description || '', permissions: permissions || 'VIEW_OWN,CALL_LEADS' },
+      data: { name },
     });
 
     await prisma.auditLog.create({
@@ -297,12 +296,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
     const { listName, prospects } = body;
     if (!listName || !Array.isArray(prospects)) return json({ error: 'listName and prospects array are required' }, 400);
 
+    // Use the first available client as the default target
+    const defaultClient = await prisma.client.findFirst({ orderBy: { createdAt: 'asc' } });
+    const clientId = defaultClient?.id;
+    if (!clientId) return json({ error: 'No client found in the system. Please create a client first.' }, 400);
+
     const project = await prisma.project.create({
-      data: { name: listName, clientId: 'client-default', status: 'PENDING_APPROVAL', progress: 0 },
+      data: { name: listName, clientId, status: 'PENDING_APPROVAL', progress: 0 },
     });
 
     await prisma.uploadedFile.create({
-      data: { fileName: listName + '.csv', fileType: 'CSV', recordCount: prospects.length, status: 'PENDING_APPROVAL', clientId: 'client-default', projectId: project.id },
+      data: { fileName: listName + '.csv', fileType: 'CSV', recordCount: prospects.length, status: 'PENDING_APPROVAL', clientId, projectId: project.id },
     });
 
     for (const p of prospects) {
@@ -315,7 +319,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
           notes: p.notes || '',
           status: 'NEW',
           projectId: project.id,
-          clientId: 'client-default',
+          clientId,
         },
       });
     }
@@ -341,7 +345,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
 
       await prisma.project.update({
         where: { id: projectId },
-        data: { agentId: employee.agentId || null, status: 'AGENT_ASSIGNED' },
+        data: { adminId: (employee as any).adminId || null, status: 'ADMIN_ASSIGNED' },
       });
       await prisma.lead.updateMany({ where: { projectId }, data: { userId: employeeId } });
 
@@ -438,13 +442,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pa
 
     const updated = await prisma.user.update({ where: { id }, data: updateData, include: { role: true } });
 
-    if (employee.agentId) {
-      const agentUpdate: any = {};
-      if (name !== undefined) agentUpdate.name = name;
-      if (email !== undefined) agentUpdate.email = email;
-      if (phone !== undefined) agentUpdate.phone = phone;
-      if (suspended !== undefined) agentUpdate.status = suspended ? 'UNAVAILABLE' : 'AVAILABLE';
-      await prisma.agent.update({ where: { id: employee.agentId }, data: agentUpdate });
+    if ((employee as any).adminId) {
+      const adminUpdate: any = {};
+      if (name !== undefined) adminUpdate.name = name;
+      if (email !== undefined) adminUpdate.email = email;
+      if (phone !== undefined) adminUpdate.phone = phone;
+      if (suspended !== undefined) adminUpdate.status = suspended ? 'UNAVAILABLE' : 'AVAILABLE';
+      await prisma.admin.update({ where: { id: (employee as any).adminId }, data: adminUpdate });
     }
 
     await prisma.auditLog.create({
@@ -457,11 +461,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pa
   // PATCH /superadmin/designations/:id
   if (pathParts[0] === 'designations' && pathParts[1]) {
     const id = pathParts[1];
-    const { name, description, permissions } = body;
+    const { name } = body;
     const data: any = {};
     if (name !== undefined) data.name = name;
-    if (description !== undefined) data.description = description;
-    if (permissions !== undefined) data.permissions = permissions;
     const designation = await prisma.designation.update({ where: { id }, data });
     return json({ designation });
   }
@@ -495,7 +497,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ p
     const employee = await prisma.user.findUnique({ where: { id } });
     if (!employee) return json({ error: 'Employee not found' }, 404);
     await prisma.user.delete({ where: { id } });
-    if (employee.agentId) await prisma.agent.delete({ where: { id: employee.agentId } });
+    if ((employee as any).adminId) await prisma.admin.delete({ where: { id: (employee as any).adminId } });
     await prisma.auditLog.create({
       data: { action: 'DELETE_EMPLOYEE', actor: user.email, details: `Deleted employee '${employee.email}'`, ipAddress: '127.0.0.1' },
     });
