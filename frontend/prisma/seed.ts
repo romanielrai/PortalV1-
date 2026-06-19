@@ -37,6 +37,12 @@ async function main() {
     create: { name: 'TEAMLEADER', description: 'Team Leader / Supervisor' },
   });
 
+  await prisma.role.upsert({
+    where: { name: 'USER' },
+    update: {},
+    create: { name: 'USER', description: 'Regular User' },
+  });
+
   console.log('✅ Roles seeded');
 
   // ── Super Admin User ───────────────────────────────────────────────────────

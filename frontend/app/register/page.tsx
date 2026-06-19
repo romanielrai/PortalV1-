@@ -56,7 +56,7 @@ export default function RegisterPage() {
           email,
           password,
           name,
-          roleName: 'USER',
+          roleName: 'CLIENT',
           phoneNumber,
           businessName: 'Personal Workspace',
           industry: 'Other',
