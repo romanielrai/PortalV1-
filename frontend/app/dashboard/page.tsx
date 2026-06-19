@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import SuperAdminDashboard from '../../components/SuperAdminDashboard';
-import AdminDashboard from '../../components/AdminDashboard';
 import ClientDashboard from '../../components/ClientDashboard';
 import AgentDashboard from '../../components/AgentDashboard';
 import { getCleanDisplayName } from '../../utils/nameHelper';
